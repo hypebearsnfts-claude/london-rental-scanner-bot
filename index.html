@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>London Rental Price Checker</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="control-panel" aria-label="Valuation settings">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">£</div>
+          <div>
+            <h1>London Rental Price Checker</h1>
+            <p>Telegram-style valuation assistant for rental links.</p>
+          </div>
+        </div>
+
+        <section class="panel-section">
+          <h2>Bot Pipeline</h2>
+          <ol class="pipeline-list">
+            <li>
+              <span>1</span>
+              <p>Crawl submitted listing and normalise bedrooms, floor area, location, rent and property type.</p>
+            </li>
+            <li>
+              <span>2</span>
+              <p>Collect matched comps from Rightmove, Zoopla, OpenRent and PrimeLocation.</p>
+            </li>
+            <li>
+              <span>3</span>
+              <p>Blend live, archived and let-agreed evidence into market rent bands.</p>
+            </li>
+            <li>
+              <span>4</span>
+              <p>Return a concise fair-value verdict with confidence scoring.</p>
+            </li>
+          </ol>
+        </section>
+
+        <section class="panel-section">
+          <h2>Current Run</h2>
+          <div class="metric-grid">
+            <div>
+              <span class="metric-label">Providers</span>
+              <strong id="providerCount">4</strong>
+            </div>
+            <div>
+              <span class="metric-label">Match Radius</span>
+              <strong id="matchRadius">0.45 mi</strong>
+            </div>
+            <div>
+              <span class="metric-label">Evidence</span>
+              <strong id="evidenceCount">18 comps</strong>
+            </div>
+            <div>
+              <span class="metric-label">Mode</span>
+              <strong>Demo</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section compact">
+          <h2>Data Sources</h2>
+          <div class="source-list" id="sourceList"></div>
+        </section>
+      </aside>
+
+      <section class="phone-frame" aria-label="Telegram bot interface">
+        <header class="chat-header">
+          <div class="avatar" aria-hidden="true">LR</div>
+          <div>
+            <h2>RentCheck London Bot</h2>
+            <p id="botStatus">online · valuation engine ready</p>
+          </div>
+          <button class="icon-button" id="resetButton" type="button" aria-label="Reset conversation" title="Reset conversation">
+            ↻
+          </button>
+        </header>
+
+        <div class="chat-feed" id="chatFeed" aria-live="polite">
+          <article class="message bot">
+            <p>Send me a London rental listing link and I’ll check whether the asking rent looks fair against matched market evidence.</p>
+            <p class="subtle">Try a Rightmove, Zoopla, OpenRent or PrimeLocation URL. You can also paste any property link for a demo run.</p>
+          </article>
+        </div>
+
+        <form class="composer" id="chatForm">
+          <label class="sr-only" for="listingInput">Property listing URL</label>
+          <input
+            id="listingInput"
+            name="listing"
+            type="url"
+            placeholder="Paste property listing URL..."
+            autocomplete="off"
+            required
+          />
+          <button class="send-button" type="submit" aria-label="Run valuation" title="Run valuation">➜</button>
+        </form>
+      </section>
+    </main>
+
+    <template id="valuationTemplate">
+      <article class="message bot valuation-card">
+        <div class="verdict-strip">
+          <div>
+            <span class="eyebrow">Verdict</span>
+            <strong data-field="verdict"></strong>
+          </div>
+          <div class="confidence-pill">
+            <span data-field="confidence"></span>
+            <small>confidence</small>
+          </div>
+        </div>
+
+        <div class="listing-summary">
+          <div>
+            <span>Asking rent</span>
+            <strong data-field="askingRent"></strong>
+          </div>
+          <div>
+            <span>Market band</span>
+            <strong data-field="marketBand"></strong>
+          </div>
+          <div>
+            <span>Price / sqft</span>
+            <strong data-field="pricePsf"></strong>
+          </div>
+          <div>
+            <span>Median comp</span>
+            <strong data-field="medianComp"></strong>
+          </div>
+        </div>
+
+        <div class="extracted-fields">
+          <h3>Captured Listing Fields</h3>
+          <dl data-field="fields"></dl>
+        </div>
+
+        <div class="band-chart" aria-label="Market band comparison">
+          <div class="band-track">
+            <span class="band-low"></span>
+            <span class="band-fair"></span>
+            <span class="band-high"></span>
+            <i data-field="priceMarker"></i>
+          </div>
+          <div class="band-labels">
+            <span data-field="lowBand"></span>
+            <span data-field="highBand"></span>
+          </div>
+        </div>
+
+        <div class="comps-block">
+          <h3>Matched Comparables</h3>
+          <div class="comps-table" data-field="comps"></div>
+        </div>
+
+        <p class="bot-copy" data-field="summary"></p>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

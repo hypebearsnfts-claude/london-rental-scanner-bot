@@ -1,0 +1,53 @@
+name: Daily rental scan
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub schedules use UTC. Running at both 11:00 and 12:00 UTC lets the
+    # Python script fire once at 12:00 London time across daylight saving.
+    - cron: "0 11 * * *"
+    - cron: "0 12 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-rental-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run rental scan
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 telegram_bot.py --scan-now
+          else
+            python3 telegram_bot.py --daily-scan
+          fi
+
+      - name: Save sent-listing memory
+        run: |
+          if ! git diff --quiet -- scanner_state.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add scanner_state.json
+            git commit -m "Update rental scan state"
+            git push
+          fi

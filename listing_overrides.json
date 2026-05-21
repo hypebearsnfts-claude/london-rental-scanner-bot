@@ -1,0 +1,14 @@
+{
+  "by_listing_id": {
+    "73207234": {
+      "name": "York Street, Marylebone W1U",
+      "asking_rent": 4500,
+      "fair_low": 4250,
+      "fair_high": 4550,
+      "target_low": 4250,
+      "target_high": 4300,
+      "status": "around fair market value, at the upper end"
+    }
+  },
+  "by_url": {}
+}
