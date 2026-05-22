@@ -923,13 +923,14 @@ def scan_rental_listings(
             page_index = 0
             while page_index < SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION:
                 query_count += 1
+                search_start = page_index if search_provider == "brave" else page_index * per_search
                 try:
                     page_results = scanner_search(
                         station_query(station, domain),
                         api_key,
                         search_provider,
                         limit=per_search,
-                        start=page_index * per_search,
+                        start=search_start,
                     )
                     if not page_results:
                         break
