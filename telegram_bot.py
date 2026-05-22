@@ -916,6 +916,7 @@ def scan_rental_listings(
     seen_this_scan: set[str] = set()
     seen_fingerprints_this_scan: set[str] = set()
     skipped: dict[str, int] = {}
+    skipped_samples: dict[str, list[str]] = {}
 
     query_count = 0
     scan_stations = stations or WATCH_STATIONS
@@ -964,6 +965,9 @@ def scan_rental_listings(
             canonical = canonical_listing_url(link)
             if not is_detail_listing_url(link):
                 skipped["not listing detail"] = skipped.get("not listing detail", 0) + 1
+                samples = skipped_samples.setdefault("not listing detail", [])
+                if len(samples) < 8:
+                    samples.append(link)
                 continue
             if not canonical or canonical in seen_this_scan:
                 continue
@@ -1031,7 +1035,13 @@ def scan_rental_listings(
             )
 
     matches.sort(key=lambda item: (item["rent"], item["beds"], item["station"]))
-    return matches, {"skipped": skipped, "queried_stations": len(scan_stations), "queries": query_count, "search_provider": search_provider}
+    return matches, {
+        "skipped": skipped,
+        "skipped_samples": skipped_samples,
+        "queried_stations": len(scan_stations),
+        "queries": query_count,
+        "search_provider": search_provider,
+    }
 
 
 def format_scanner_listing(item: dict[str, Any]) -> str:
