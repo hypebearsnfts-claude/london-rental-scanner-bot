@@ -85,10 +85,10 @@ WATCH_PORTALS = {
 }
 
 PORTAL_DETAIL_SEARCH_CLAUSES = {
-    "rightmove.co.uk": "site:rightmove.co.uk/properties/",
-    "zoopla.co.uk": "site:zoopla.co.uk/to-rent/details/",
-    "onthemarket.com": "site:onthemarket.com/details/",
-    "openrent.co.uk": "site:openrent.co.uk/property-to-rent/",
+    "rightmove.co.uk": "site:rightmove.co.uk inurl:properties",
+    "zoopla.co.uk": "site:zoopla.co.uk inurl:to-rent/details",
+    "onthemarket.com": "site:onthemarket.com inurl:details",
+    "openrent.co.uk": "site:openrent.co.uk inurl:property-to-rent",
 }
 
 
