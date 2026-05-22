@@ -84,6 +84,13 @@ WATCH_PORTALS = {
     "openrent.co.uk": "OpenRent",
 }
 
+PORTAL_DETAIL_SEARCH_CLAUSES = {
+    "rightmove.co.uk": "site:rightmove.co.uk/properties/",
+    "zoopla.co.uk": "site:zoopla.co.uk/to-rent/details/",
+    "onthemarket.com": "site:onthemarket.com/details/",
+    "openrent.co.uk": "site:openrent.co.uk/property-to-rent/",
+}
+
 
 @dataclass(frozen=True)
 class Area:
@@ -882,7 +889,7 @@ def enrich_scanner_text(link: str, title: str, snippet: str) -> tuple[str, str, 
 
 
 def station_query(station: str, domain: str | None = None) -> str:
-    portal_clause = f"site:{domain}" if domain else " OR ".join(f"site:{item}" for item in WATCH_PORTALS)
+    portal_clause = PORTAL_DETAIL_SEARCH_CLAUSES.get(domain, f"site:{domain}") if domain else " OR ".join(PORTAL_DETAIL_SEARCH_CLAUSES.values())
     aliases = STATION_ALIASES.get(station, [station])
     station_clause = " OR ".join(f'"{alias}"' for alias in aliases)
     return (
