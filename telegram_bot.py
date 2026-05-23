@@ -37,6 +37,7 @@ LOCAL_TZ = ZoneInfo("Europe/London")
 DAILY_SCAN_HOUR = 12
 SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
+SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
 REQUIRE_LIVE_DETAIL_VERIFICATION = True
 MAX_WALKING_MINUTES = 8
 USE_GOOGLE_MAPS_WALKING_FILTER = False
@@ -466,10 +467,11 @@ def load_scanner_state() -> dict[str, Any]:
                 data.setdefault("sent_urls", [])
                 data.setdefault("sent_fingerprints", [])
                 data.setdefault("last_scan_date", "")
+                data.setdefault("last_scan_failure_date", "")
                 return data
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         pass
-    return {"subscribers": [], "sent_urls": [], "sent_fingerprints": [], "last_scan_date": ""}
+    return {"subscribers": [], "sent_urls": [], "sent_fingerprints": [], "last_scan_date": "", "last_scan_failure_date": ""}
 
 
 def save_scanner_state(state: dict[str, Any]) -> None:
@@ -917,6 +919,7 @@ def scan_rental_listings(
     seen_fingerprints_this_scan: set[str] = set()
     skipped: dict[str, int] = {}
     skipped_samples: dict[str, list[str]] = {}
+    consecutive_search_errors = 0
 
     query_count = 0
     scan_stations = stations or WATCH_STATIONS
@@ -940,6 +943,7 @@ def scan_rental_listings(
                         limit=per_search,
                         start=search_start,
                     )
+                    consecutive_search_errors = 0
                     if not page_results:
                         break
                     new_results = []
@@ -956,10 +960,32 @@ def scan_rental_listings(
                 except urllib.error.HTTPError as error:
                     key = f"search error: {station} {domain}: HTTP {error.code}"
                     skipped[key] = skipped.get(key, 0) + 1
+                    consecutive_search_errors += 1
+                    if consecutive_search_errors >= SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS:
+                        skipped["search stopped after repeated API errors"] = skipped.get("search stopped after repeated API errors", 0) + 1
+                        return matches, {
+                            "skipped": skipped,
+                            "skipped_samples": skipped_samples,
+                            "queried_stations": len(scan_stations),
+                            "queries": query_count,
+                            "search_provider": search_provider,
+                            "stopped_early": True,
+                        }
                     break
                 except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as error:
                     key = f"search error: {station} {domain}: {type(error).__name__}"
                     skipped[key] = skipped.get(key, 0) + 1
+                    consecutive_search_errors += 1
+                    if consecutive_search_errors >= SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS:
+                        skipped["search stopped after repeated API errors"] = skipped.get("search stopped after repeated API errors", 0) + 1
+                        return matches, {
+                            "skipped": skipped,
+                            "skipped_samples": skipped_samples,
+                            "queried_stations": len(scan_stations),
+                            "queries": query_count,
+                            "search_provider": search_provider,
+                            "stopped_early": True,
+                        }
                     break
             if page_index >= SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION:
                 skipped["safety page cap reached"] = skipped.get("safety page cap reached", 0) + 1
@@ -1068,6 +1094,11 @@ def scan_error_count(meta: dict[str, Any]) -> int:
     return sum(value for key, value in meta.get("skipped", {}).items() if key.startswith("search error:"))
 
 
+def is_search_outage(meta: dict[str, Any]) -> bool:
+    queries = int(meta.get("queries", 0) or 0)
+    return bool(queries and scan_error_count(meta) >= queries)
+
+
 def format_skip_summary(meta: dict[str, Any]) -> str:
     skipped = meta.get("skipped", {})
     if not skipped:
@@ -1090,17 +1121,21 @@ def format_skip_summary(meta: dict[str, Any]) -> str:
 def format_scan_summary(matches: list[dict[str, Any]], meta: dict[str, Any]) -> str:
     provider = meta.get("search_provider", "search API")
     queries = meta.get("queries", 0)
-    search_errors = scan_error_count(meta)
     if matches:
         return (
             f"Found {len(matches)} new matching live listing(s). "
             f"Checked {meta.get('queried_stations', 0)} stations across {queries} {provider} searches. "
             "Sending all of them now."
         )
-    if queries and search_errors >= queries:
+    if is_search_outage(meta):
         return (
             f"Scan could not search properly today. {provider} returned errors for all {queries} searches, "
             "so I did not receive usable listing results. Please check the search API quota/key."
+        )
+    if meta.get("stopped_early"):
+        return (
+            f"Scan stopped early because {provider} returned repeated errors. "
+            "I did not keep hammering the API. Please check the search API quota/key."
         )
     return (
         f"No new matching live listings found. Checked {meta.get('queried_stations', 0)} stations "
@@ -2009,24 +2044,27 @@ class TelegramBot:
         response = self.api("getUpdates", {"offset": self.offset, "timeout": 30}, timeout=40)
         return response["result"]
 
-    def run_scan_for_chat(self, chat_id: int, include_seen: bool = False) -> None:
+    def run_scan_for_chat(self, chat_id: int, include_seen: bool = False, announce: bool = True) -> dict[str, Any]:
         search_provider, api_key = scanner_search_credentials()
         if not api_key:
-            self.send_message(chat_id, f"Scanner needs {BRAVE_SEARCH_API_KEY_ENV} or {SERPAPI_KEY_ENV}. Export one in the bot terminal and restart.")
-            return
+            message = f"Scanner needs {BRAVE_SEARCH_API_KEY_ENV} or {SERPAPI_KEY_ENV}. Export one in the bot terminal and restart."
+            self.send_message(chat_id, message)
+            return {"fatal_error": message}
         google_maps_key = os.environ.get(GOOGLE_MAPS_API_KEY_ENV, "").strip()
         if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
-            self.send_message(chat_id, f"Scanner needs {GOOGLE_MAPS_API_KEY_ENV} for exact {MAX_WALKING_MINUTES}-minute walking-distance checks. Export it in the bot terminal and restart.")
-            return
+            message = f"Scanner needs {GOOGLE_MAPS_API_KEY_ENV} for exact {MAX_WALKING_MINUTES}-minute walking-distance checks. Export it in the bot terminal and restart."
+            self.send_message(chat_id, message)
+            return {"fatal_error": message}
 
         log_event(f"scan_start chat={chat_id} include_seen={include_seen} provider={search_provider}")
-        self.send_message(chat_id, "Scan started. I’m checking the portals now; this can take a minute or two.")
-        self.send_typing(chat_id)
+        if announce:
+            self.send_message(chat_id, "Scan started. I’m checking the portals now; this can take a minute or two.")
+            self.send_typing(chat_id)
         matches, meta = scan_rental_listings(api_key, search_provider=search_provider, include_seen=include_seen, google_maps_key=google_maps_key)
         log_event(f"scan_done chat={chat_id} matches={len(matches)} meta={meta}")
         self.send_message(chat_id, format_scan_summary(matches, meta))
         if not matches:
-            return
+            return meta
 
         state = load_scanner_state()
         sent_urls = set(state.get("sent_urls", []))
@@ -2040,6 +2078,7 @@ class TelegramBot:
         state["sent_urls"] = sorted(sent_urls)
         state["sent_fingerprints"] = sorted(sent_fingerprints)
         save_scanner_state(state)
+        return meta
 
     def run_test_scan_for_chat(self, chat_id: int) -> None:
         search_provider, api_key = scanner_search_credentials()
@@ -2081,17 +2120,30 @@ class TelegramBot:
         today = now.date().isoformat()
         state = load_scanner_state()
         subscribers = [int(chat_id) for chat_id in state.get("subscribers", [])]
-        if not subscribers or state.get("last_scan_date") == today or now.hour < DAILY_SCAN_HOUR:
+        if (
+            not subscribers
+            or state.get("last_scan_date") == today
+            or state.get("last_scan_failure_date") == today
+            or now.hour < DAILY_SCAN_HOUR
+        ):
             return
 
         log_event(f"daily_scan subscribers={subscribers}")
+        scan_failed = False
         for chat_id in subscribers:
             try:
-                self.run_scan_for_chat(chat_id)
+                meta = self.run_scan_for_chat(chat_id, announce=False)
+                if meta.get("fatal_error") or is_search_outage(meta) or meta.get("stopped_early"):
+                    scan_failed = True
             except Exception as error:
                 log_event(f"daily_scan_error chat={chat_id} {type(error).__name__}: {error}")
+                scan_failed = True
         state = load_scanner_state()
-        state["last_scan_date"] = today
+        if scan_failed:
+            state["last_scan_failure_date"] = today
+        else:
+            state["last_scan_date"] = today
+            state["last_scan_failure_date"] = ""
         save_scanner_state(state)
 
     def handle_text(self, chat_id: int, text: str) -> None:
@@ -2136,7 +2188,8 @@ class TelegramBot:
                     f"Subscribed: {'yes' if subscribed else 'no'}\n"
                     f"Sent listings remembered: {len(state.get('sent_urls', []))}\n"
                     f"Sent property fingerprints remembered: {len(state.get('sent_fingerprints', []))}\n"
-                    f"Last daily scan: {state.get('last_scan_date') or 'never'}"
+                    f"Last daily scan: {state.get('last_scan_date') or 'never'}\n"
+                    f"Last failed scan: {state.get('last_scan_failure_date') or 'never'}"
                 ),
             )
             return
@@ -2146,6 +2199,7 @@ class TelegramBot:
             state["sent_urls"] = []
             state["sent_fingerprints"] = []
             state["last_scan_date"] = ""
+            state["last_scan_failure_date"] = ""
             save_scanner_state(state)
             self.send_message(chat_id, "Cleared remembered sent listings. The next /scan can send everything it finds again.")
             return
