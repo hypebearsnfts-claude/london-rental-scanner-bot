@@ -30,6 +30,7 @@ SERPAPI_KEY_ENV = "SERPAPI_KEY"
 BRAVE_SEARCH_API_KEY_ENV = "BRAVE_SEARCH_API_KEY"
 TELEGRAM_CHAT_ID_ENV = "TELEGRAM_CHAT_ID"
 GOOGLE_MAPS_API_KEY_ENV = "GOOGLE_MAPS_API_KEY"
+SCAN_BACKEND_ENV = "SCAN_BACKEND"
 OVERRIDES_FILE = "listing_overrides.json"
 LOG_FILE = "bot.log"
 SCANNER_STATE_FILE = "scanner_state.json"
@@ -38,6 +39,8 @@ DAILY_SCAN_HOUR = 12
 SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
+PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION = 50
+PLAYWRIGHT_NAV_TIMEOUT_MS = 18_000
 REQUIRE_LIVE_DETAIL_VERIFICATION = True
 MAX_WALKING_MINUTES = 8
 USE_GOOGLE_MAPS_WALKING_FILTER = False
@@ -900,6 +903,281 @@ def station_query(station: str, domain: str | None = None) -> str:
         '("2 bedroom" OR "3 bedroom" OR "4 bedroom" OR "5 bedroom" OR "6 bedroom" OR "7 bedroom" OR "8 bedroom") '
         '"to rent" furnished "pcm" London ("near" OR "station" OR "underground" OR "tube") -concierge -"let agreed" -"short let"'
     )
+
+
+def add_query_params(url: str, **params: Any) -> str:
+    parsed = urllib.parse.urlparse(url)
+    existing = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
+    for key, value in params.items():
+        if value is not None:
+            existing[key] = str(value)
+    return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(existing)))
+
+
+def playwright_search_url(domain: str, station: str, page_index: int) -> str:
+    term = f"{station} station"
+    if domain == "rightmove.co.uk":
+        url = "https://www.rightmove.co.uk/property-to-rent/find.html"
+        return add_query_params(
+            url,
+            searchLocation=term,
+            useLocationIdentifier="false",
+            radius="0.5",
+            minBedrooms=2,
+            maxBedrooms=8,
+            maxPrice=14000,
+            includeLetAgreed="false",
+            furnishTypes="furnished",
+            dontShow="houseShare,student,retirement",
+            index=page_index * 24,
+        )
+    if domain == "zoopla.co.uk":
+        url = "https://www.zoopla.co.uk/to-rent/property/london/"
+        return add_query_params(
+            url,
+            q=term,
+            beds_min=2,
+            beds_max=8,
+            price_frequency="per_month",
+            price_max=14000,
+            furnished_state="furnished",
+            include_shared_accommodation="false",
+            pn=page_index + 1,
+        )
+    if domain == "onthemarket.com":
+        url = "https://www.onthemarket.com/to-rent/property/london/"
+        return add_query_params(
+            url,
+            **{
+                "search-location": term,
+                "min-bedrooms": 2,
+                "max-bedrooms": 8,
+                "max-price": 14000,
+                "furnished": "true",
+                "page": page_index + 1,
+            },
+        )
+    if domain == "openrent.co.uk":
+        url = "https://www.openrent.co.uk/properties-to-rent/london"
+        return add_query_params(
+            url,
+            term=term,
+            bedrooms_min=2,
+            bedrooms_max=8,
+            prices_max=14000,
+            furnishing="Furnished",
+            page=page_index + 1,
+        )
+    return f"https://www.{domain}/"
+
+
+def playwright_search_backend_available() -> bool:
+    try:
+        import playwright.sync_api  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def scan_backend() -> str:
+    return os.environ.get(SCAN_BACKEND_ENV, "playwright").strip().lower() or "playwright"
+
+
+def playwright_collect_links(page: Any) -> list[dict[str, str]]:
+    return page.evaluate(
+        """
+        () => {
+          const anchors = Array.from(document.querySelectorAll('a[href]'));
+          const rows = [];
+          for (const anchor of anchors) {
+            const href = anchor.href;
+            const title = (anchor.innerText || anchor.getAttribute('aria-label') || document.title || '').trim();
+            let node = anchor.closest('article, li, [data-testid], [class*="property"], [class*="listing"], [class*="card"]');
+            let snippet = node ? node.innerText : anchor.innerText;
+            rows.push({
+              title: title.slice(0, 180),
+              link: href,
+              snippet: (snippet || '').replace(/\\s+/g, ' ').trim().slice(0, 2000),
+              source: location.hostname,
+              date: ''
+            });
+          }
+          return rows;
+        }
+        """
+    )
+
+
+def playwright_page_text(context: Any, url: str) -> tuple[str, str]:
+    detail_page = context.new_page()
+    try:
+        detail_page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
+        try:
+            detail_page.locator("button:has-text('Accept')").first.click(timeout=1200)
+        except Exception:
+            pass
+        title = detail_page.title() or ""
+        text = detail_page.locator("body").inner_text(timeout=5000)
+        return title, compact_text(text, 9000)
+    finally:
+        detail_page.close()
+
+
+def scan_rental_listings_playwright(
+    include_seen: bool = False,
+    stations: list[str] | None = None,
+    domains: list[str] | None = None,
+    google_maps_key: str = "",
+    max_pages_per_portal_station: int | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    from playwright.sync_api import sync_playwright
+
+    state = load_scanner_state()
+    sent_urls = set(state.get("sent_urls", []))
+    sent_fingerprints = set(state.get("sent_fingerprints", []))
+    matches: list[dict[str, Any]] = []
+    seen_this_scan: set[str] = set()
+    seen_fingerprints_this_scan: set[str] = set()
+    skipped: dict[str, int] = {}
+    skipped_samples: dict[str, list[str]] = {}
+
+    scan_stations = stations or WATCH_STATIONS
+    scan_domains = domains or list(WATCH_PORTALS.keys())
+    max_pages = max_pages_per_portal_station or PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION
+    pages_checked = 0
+    detail_pages_checked = 0
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context(
+            locale="en-GB",
+            timezone_id="Europe/London",
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+            ),
+        )
+        page = context.new_page()
+        try:
+            for station in scan_stations:
+                for domain in scan_domains:
+                    seen_page_links: set[str] = set()
+                    for page_index in range(max_pages):
+                        url = playwright_search_url(domain, station, page_index)
+                        pages_checked += 1
+                        try:
+                            page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
+                            try:
+                                page.locator("button:has-text('Accept')").first.click(timeout=1200)
+                            except Exception:
+                                pass
+                            page_results = playwright_collect_links(page)
+                        except Exception as error:
+                            key = f"playwright search error: {station} {domain}: {type(error).__name__}"
+                            skipped[key] = skipped.get(key, 0) + 1
+                            break
+
+                        new_detail_links = []
+                        for result in page_results:
+                            link = canonical_listing_url(result.get("link", ""))
+                            if not is_detail_listing_url(link):
+                                continue
+                            if link in seen_page_links:
+                                continue
+                            seen_page_links.add(link)
+                            result["link"] = link
+                            new_detail_links.append(result)
+
+                        if not new_detail_links:
+                            break
+
+                        for result in new_detail_links:
+                            link = result["link"]
+                            canonical = canonical_listing_url(link)
+                            if not canonical or canonical in seen_this_scan:
+                                continue
+                            seen_this_scan.add(canonical)
+                            if canonical in sent_urls and not include_seen:
+                                skipped["already sent"] = skipped.get("already sent", 0) + 1
+                                continue
+
+                            detail_pages_checked += 1
+                            try:
+                                detail_title, detail_text = playwright_page_text(context, link)
+                                title = detail_title or result.get("title", "")
+                                snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)}"
+                                lowered = snippet.lower()
+                                if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
+                                    skipped["not live"] = skipped.get("not live", 0) + 1
+                                    continue
+                            except Exception as error:
+                                skipped["detail page blocked"] = skipped.get("detail page blocked", 0) + 1
+                                samples = skipped_samples.setdefault("detail page blocked", [])
+                                if len(samples) < 8:
+                                    samples.append(f"{link} ({type(error).__name__})")
+                                continue
+
+                            ok, reason, beds, rent = passes_scanner_filters(title, snippet)
+                            if not ok:
+                                skipped[reason] = skipped.get(reason, 0) + 1
+                                continue
+                            fingerprint = listing_fingerprint(title, snippet, beds, rent, station)
+                            if fingerprint in seen_fingerprints_this_scan:
+                                skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
+                                continue
+                            if fingerprint in sent_fingerprints and not include_seen:
+                                skipped["already sent property"] = skipped.get("already sent property", 0) + 1
+                                continue
+                            seen_fingerprints_this_scan.add(fingerprint)
+
+                            address = extract_listing_address(title, snippet)
+                            if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
+                                skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
+                                continue
+                            if USE_GOOGLE_MAPS_WALKING_FILTER and not address:
+                                skipped["address not visible"] = skipped.get("address not visible", 0) + 1
+                                continue
+                            if USE_GOOGLE_MAPS_WALKING_FILTER:
+                                closest = closest_watched_station(address, google_maps_key, preferred_station=station)
+                                if not closest:
+                                    skipped["walking distance unavailable"] = skipped.get("walking distance unavailable", 0) + 1
+                                    continue
+                                if closest["minutes"] > MAX_WALKING_MINUTES:
+                                    skipped["over 8 min walk"] = skipped.get("over 8 min walk", 0) + 1
+                                    continue
+                            else:
+                                closest = {"station": station, "minutes": None}
+
+                            matches.append(
+                                {
+                                    "title": clean_listing_title(title),
+                                    "snippet": compact_text(snippet, 180),
+                                    "link": link,
+                                    "canonical": canonical,
+                                    "portal": portal_from_link(link),
+                                    "station": station,
+                                    "closest_station": closest["station"],
+                                    "walking_minutes": closest["minutes"],
+                                    "address": address,
+                                    "beds": beds,
+                                    "rent": rent,
+                                    "live_status": "verified",
+                                    "fingerprint": fingerprint,
+                                }
+                            )
+        finally:
+            context.close()
+            browser.close()
+
+    matches.sort(key=lambda item: (item["rent"], item["beds"], item["station"]))
+    return matches, {
+        "skipped": skipped,
+        "skipped_samples": skipped_samples,
+        "queried_stations": len(scan_stations),
+        "queries": pages_checked,
+        "detail_pages_checked": detail_pages_checked,
+        "search_provider": "playwright",
+    }
 
 
 def scan_rental_listings(
@@ -2045,22 +2323,36 @@ class TelegramBot:
         return response["result"]
 
     def run_scan_for_chat(self, chat_id: int, include_seen: bool = False, announce: bool = True) -> dict[str, Any]:
-        search_provider, api_key = scanner_search_credentials()
-        if not api_key:
-            message = f"Scanner needs {BRAVE_SEARCH_API_KEY_ENV} or {SERPAPI_KEY_ENV}. Export one in the bot terminal and restart."
-            self.send_message(chat_id, message)
-            return {"fatal_error": message}
         google_maps_key = os.environ.get(GOOGLE_MAPS_API_KEY_ENV, "").strip()
         if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
             message = f"Scanner needs {GOOGLE_MAPS_API_KEY_ENV} for exact {MAX_WALKING_MINUTES}-minute walking-distance checks. Export it in the bot terminal and restart."
             self.send_message(chat_id, message)
             return {"fatal_error": message}
 
-        log_event(f"scan_start chat={chat_id} include_seen={include_seen} provider={search_provider}")
+        backend = scan_backend()
+        search_provider, api_key = scanner_search_credentials()
+        if backend != "playwright" and not api_key:
+            message = f"Scanner needs {BRAVE_SEARCH_API_KEY_ENV} or {SERPAPI_KEY_ENV}. Export one in the bot terminal and restart."
+            self.send_message(chat_id, message)
+            return {"fatal_error": message}
+
+        log_event(f"scan_start chat={chat_id} include_seen={include_seen} backend={backend}")
         if announce:
             self.send_message(chat_id, "Scan started. I’m checking the portals now; this can take a minute or two.")
             self.send_typing(chat_id)
-        matches, meta = scan_rental_listings(api_key, search_provider=search_provider, include_seen=include_seen, google_maps_key=google_maps_key)
+        if backend == "playwright":
+            if not playwright_search_backend_available():
+                if not api_key:
+                    message = "Playwright is not installed, and no search API fallback is configured."
+                    self.send_message(chat_id, message)
+                    return {"fatal_error": message}
+                log_event(f"playwright_unavailable fallback_provider={search_provider}")
+                matches, meta = scan_rental_listings(api_key, search_provider=search_provider, include_seen=include_seen, google_maps_key=google_maps_key)
+                meta["playwright_unavailable"] = True
+            else:
+                matches, meta = scan_rental_listings_playwright(include_seen=include_seen, google_maps_key=google_maps_key)
+        else:
+            matches, meta = scan_rental_listings(api_key, search_provider=search_provider, include_seen=include_seen, google_maps_key=google_maps_key)
         log_event(f"scan_done chat={chat_id} matches={len(matches)} meta={meta}")
         self.send_message(chat_id, format_scan_summary(matches, meta))
         if not matches:
@@ -2081,25 +2373,35 @@ class TelegramBot:
         return meta
 
     def run_test_scan_for_chat(self, chat_id: int) -> None:
-        search_provider, api_key = scanner_search_credentials()
-        if not api_key:
-            self.send_message(chat_id, f"Test scan needs {BRAVE_SEARCH_API_KEY_ENV} or {SERPAPI_KEY_ENV}. Export one in the bot terminal and restart.")
-            return
         google_maps_key = os.environ.get(GOOGLE_MAPS_API_KEY_ENV, "").strip()
         if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
             self.send_message(chat_id, f"Test scan needs {GOOGLE_MAPS_API_KEY_ENV} for walking-distance checks. Export it in the bot terminal and restart.")
             return
 
         self.send_message(chat_id, "Test scan started. I’ll check a small sample and report counts only.")
-        matches, meta = scan_rental_listings(
-            api_key,
-            search_provider=search_provider,
-            include_seen=True,
-            stations=["Baker Street", "Victoria"],
-            domains=["rightmove.co.uk", "onthemarket.com"],
-            results_per_search=10,
-            google_maps_key=google_maps_key,
-        )
+        backend = scan_backend()
+        search_provider, api_key = scanner_search_credentials()
+        if backend == "playwright" and playwright_search_backend_available():
+            matches, meta = scan_rental_listings_playwright(
+                include_seen=True,
+                stations=["Baker Street"],
+                domains=["rightmove.co.uk", "openrent.co.uk"],
+                google_maps_key=google_maps_key,
+                max_pages_per_portal_station=1,
+            )
+        else:
+            if not api_key:
+                self.send_message(chat_id, f"Test scan needs Playwright, {BRAVE_SEARCH_API_KEY_ENV}, or {SERPAPI_KEY_ENV}.")
+                return
+            matches, meta = scan_rental_listings(
+                api_key,
+                search_provider=search_provider,
+                include_seen=True,
+                stations=["Baker Street", "Victoria"],
+                domains=["rightmove.co.uk", "onthemarket.com"],
+                results_per_search=10,
+                google_maps_key=google_maps_key,
+            )
         log_event(f"test_scan chat={chat_id} matches={len(matches)} meta={meta}")
         sample = "\n".join(
             f"• {html.escape(item['title'])} | {item['beds']} bed | {money(item['rent'])} | {html.escape(item['portal'])}"
