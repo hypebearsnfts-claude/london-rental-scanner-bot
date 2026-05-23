@@ -729,12 +729,12 @@ def brave_search(query: str, api_key: str, limit: int = 20, start: int = 0) -> l
 
 
 def scanner_search_credentials() -> tuple[str, str]:
-    brave_key = os.environ.get(BRAVE_SEARCH_API_KEY_ENV, "").strip()
-    if brave_key:
-        return "brave", brave_key
     serpapi_key = os.environ.get(SERPAPI_KEY_ENV, "").strip()
     if serpapi_key:
         return "serpapi", serpapi_key
+    brave_key = os.environ.get(BRAVE_SEARCH_API_KEY_ENV, "").strip()
+    if brave_key:
+        return "brave", brave_key
     return "", ""
 
 
