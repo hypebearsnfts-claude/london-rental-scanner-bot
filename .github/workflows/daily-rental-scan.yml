@@ -2,6 +2,15 @@ name: Daily rental scan
 
 on:
   workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: "Use test for a small sample, full for the uncapped scanner."
+        required: true
+        default: "test"
+        type: choice
+        options:
+          - test
+          - full
   schedule:
     # GitHub schedules use UTC. Running at both 11:00 and 12:00 UTC lets the
     # Python script fire once at 12:00 London time across daylight saving.
@@ -37,7 +46,11 @@ jobs:
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python3 telegram_bot.py --scan-now
+            if [ "${{ inputs.scan_mode }}" = "full" ]; then
+              python3 telegram_bot.py --scan-now
+            else
+              python3 telegram_bot.py --test-scan-now
+            fi
           else
             python3 telegram_bot.py --daily-scan
           fi

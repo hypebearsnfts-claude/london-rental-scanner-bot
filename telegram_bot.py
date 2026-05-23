@@ -2220,6 +2220,14 @@ def main() -> int:
         for chat_id in chat_ids:
             bot.run_scan_for_chat(chat_id)
         return 0
+    if "--test-scan-now" in sys.argv:
+        chat_ids = chat_ids_from_env() or [int(item) for item in load_scanner_state().get("subscribers", [])]
+        if not chat_ids:
+            print(f"Missing {TELEGRAM_CHAT_ID_ENV}. Set it to your Telegram chat id for GitHub Actions.", file=sys.stderr)
+            return 2
+        for chat_id in chat_ids:
+            bot.run_test_scan_for_chat(chat_id)
+        return 0
 
     bot.run()
     return 0
