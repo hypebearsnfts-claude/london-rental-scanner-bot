@@ -953,6 +953,10 @@ def scan_rental_listings(
                         break
                     station_results.extend(new_results)
                     page_index += 1
+                except urllib.error.HTTPError as error:
+                    key = f"search error: {station} {domain}: HTTP {error.code}"
+                    skipped[key] = skipped.get(key, 0) + 1
+                    break
                 except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as error:
                     key = f"search error: {station} {domain}: {type(error).__name__}"
                     skipped[key] = skipped.get(key, 0) + 1
@@ -1060,16 +1064,49 @@ def format_scanner_listing(item: dict[str, Any]) -> str:
     )
 
 
+def scan_error_count(meta: dict[str, Any]) -> int:
+    return sum(value for key, value in meta.get("skipped", {}).items() if key.startswith("search error:"))
+
+
+def format_skip_summary(meta: dict[str, Any]) -> str:
+    skipped = meta.get("skipped", {})
+    if not skipped:
+        return "No searchable results were returned."
+
+    search_errors = scan_error_count(meta)
+    non_error_skips = {
+        key: value
+        for key, value in skipped.items()
+        if not key.startswith("search error:")
+    }
+    parts: list[str] = []
+    if search_errors:
+        parts.append(f"{search_errors} search API errors")
+    for key, value in sorted(non_error_skips.items(), key=lambda item: item[1], reverse=True)[:5]:
+        parts.append(f"{value} {key}")
+    return ", ".join(parts) if parts else "No matching live listings after filtering."
+
+
 def format_scan_summary(matches: list[dict[str, Any]], meta: dict[str, Any]) -> str:
     provider = meta.get("search_provider", "search API")
+    queries = meta.get("queries", 0)
+    search_errors = scan_error_count(meta)
     if matches:
         return (
             f"Found {len(matches)} new matching live listing(s). "
-            f"Checked {meta.get('queried_stations', 0)} stations across {meta.get('queries', 0)} {provider} searches. "
+            f"Checked {meta.get('queried_stations', 0)} stations across {queries} {provider} searches. "
             "Sending all of them now."
         )
-    skipped = ", ".join(f"{key}: {value}" for key, value in meta.get("skipped", {}).items()) or "no searchable results"
-    return f"No new matching listings found. Checked {meta.get('queried_stations', 0)} stations across {meta.get('queries', 0)} {provider} searches. Skipped: {html.escape(skipped)}"
+    if queries and search_errors >= queries:
+        return (
+            f"Scan could not search properly today. {provider} returned errors for all {queries} searches, "
+            "so I did not receive usable listing results. Please check the search API quota/key."
+        )
+    return (
+        f"No new matching live listings found. Checked {meta.get('queried_stations', 0)} stations "
+        f"across {queries} {provider} searches. "
+        f"Summary: {html.escape(format_skip_summary(meta))}"
+    )
 
 
 def build_research_queries(subject: dict[str, Any]) -> list[tuple[str, str]]:
@@ -2034,7 +2071,7 @@ class TelegramBot:
             (
                 f"Test scan complete.\n"
                 f"Sample matches: {len(matches)}\n"
-                f"Skipped: {html.escape(str(meta.get('skipped', {})))}\n\n"
+                f"Summary: {html.escape(format_skip_summary(meta))}\n\n"
                 f"{sample}"
             ),
         )
