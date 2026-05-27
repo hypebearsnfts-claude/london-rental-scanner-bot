@@ -96,6 +96,18 @@ PORTAL_DETAIL_SEARCH_CLAUSES = {
     "openrent.co.uk": "site:openrent.co.uk inurl:property-to-rent",
 }
 
+SCANNER_BLACKLISTED_KEYWORDS = [
+    "concierge",
+    "24 hour concierge",
+    "24 hours concierge",
+    "24-hour concierge",
+    "24-hours concierge",
+    "24hr concierge",
+    "24 hr concierge",
+    "24/7 concierge",
+    "building concierge",
+]
+
 RIGHTMOVE_LOCATION_IDS = {
     "Kensington Olympia": "STATION^5011",
     "Marble Arch": "STATION^6032",
@@ -960,8 +972,8 @@ def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | N
     lowered = text.lower()
     if any(term in lowered for term in ["room to rent", "house share", "flat share", "shared accommodation", "student accommodation", "double room", "single room", "large bright bedroom", "room in a"]):
         return False, "shared/student accommodation", None, None
-    if "concierge" in lowered:
-        return False, "contains concierge", None, None
+    if any(term in lowered for term in SCANNER_BLACKLISTED_KEYWORDS):
+        return False, "contains concierge/blacklisted service", None, None
     if "let agreed" in lowered or "let-agreed" in lowered:
         return False, "let agreed", None, None
     if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let by", "now let"]):
