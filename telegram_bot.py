@@ -31,6 +31,7 @@ BRAVE_SEARCH_API_KEY_ENV = "BRAVE_SEARCH_API_KEY"
 TELEGRAM_CHAT_ID_ENV = "TELEGRAM_CHAT_ID"
 GOOGLE_MAPS_API_KEY_ENV = "GOOGLE_MAPS_API_KEY"
 SCAN_BACKEND_ENV = "SCAN_BACKEND"
+PLAYWRIGHT_VERIFY_DETAIL_PAGES_ENV = "PLAYWRIGHT_VERIFY_DETAIL_PAGES"
 OVERRIDES_FILE = "listing_overrides.json"
 LOG_FILE = "bot.log"
 SCANNER_STATE_FILE = "scanner_state.json"
@@ -53,7 +54,7 @@ MONEY_RE = re.compile(
 )
 SQFT_RE = re.compile(r"\b([0-9]{3,4})\s*(?:sq\.?\s*ft|sqft|square feet)\b", re.IGNORECASE)
 SQFT_REVERSED_RE = re.compile(r"\b(?:sq\.?\s*ft|sqft|square feet)\s*:?\s*([0-9]{3,4})\b", re.IGNORECASE)
-BED_RE = re.compile(r"\b([1-6])\s*(?:bed|bedroom|br)\b", re.IGNORECASE)
+BED_RE = re.compile(r"\b([1-8])\s*(?:bed|bedroom|br)\b", re.IGNORECASE)
 
 WATCH_STATIONS = [
     "Kensington Olympia",
@@ -496,6 +497,46 @@ def clean_listing_title(title: str) -> str:
     return compact_text(cleaned, 95) or "Rental listing"
 
 
+def title_from_result_text(title: str, snippet: str) -> str:
+    title = compact_text(html.unescape(title or ""), 160)
+    snippet = compact_text(html.unescape(snippet or ""), 1200)
+    weak_title = (
+        not title
+        or "property to rent in " in title.lower()
+        or "to rent around " in title.lower()
+        or title.lower() in {"email", "call", "view details"}
+        or re.fullmatch(r"\d+/\d+", title.strip()) is not None
+        or bool(re.match(r"^£?[\d,]+\s*pcm", title))
+    )
+    if not weak_title:
+        return title
+
+    openrent_match = re.search(
+        r"\b([2-8]\s+Bed\s+(?:Flat|House|Maisonette|Apartment|Property),\s*[^£]{3,80}?\b[A-Z]{1,2}\d{1,2}[A-Z]?)\b",
+        snippet,
+        re.IGNORECASE,
+    )
+    if openrent_match:
+        return clean_listing_title(title_case_address(openrent_match.group(1)))
+
+    address_matches = re.findall(
+        r"\b([A-Z][A-Za-z0-9' .&-]{2,70}(?:,\s*[A-Za-z' .&-]{2,40}){1,3},?\s+[A-Z]{1,2}\d{1,2}[A-Z]?)\b",
+        snippet,
+    )
+    if address_matches:
+        return clean_listing_title(address_matches[-1])
+
+    rightmove_match = re.search(
+        r"\b(?:Flat|Apartment|House|Maisonette|Property)\s*,?\s+([^£]{4,90}?(?:London|[A-Z]{1,2}\d{1,2}[A-Z]?))\s+(?:Flat|Apartment|House|Maisonette|Property|[2-8]\b)",
+        snippet,
+        re.IGNORECASE,
+    )
+    if rightmove_match:
+        return clean_listing_title(title_case_address(rightmove_match.group(1)))
+
+    return title or "Rental listing"
+
+
 def normalized_listing_text(value: str) -> str:
     text = html.unescape(value).lower()
     text = re.sub(r"https?://\S+", " ", text)
@@ -764,7 +805,7 @@ def is_detail_listing_url(url: str) -> bool:
     if "rightmove.co.uk" in host:
         return "/properties/" in path
     if "zoopla.co.uk" in host:
-        return "/to-rent/details/" in path
+        return re.search(r"/to-rent/details/\d+", path) is not None
     if "onthemarket.com" in host:
         return "/details/" in path
     if "openrent.co.uk" in host:
@@ -774,7 +815,14 @@ def is_detail_listing_url(url: str) -> bool:
 
 def extract_bedrooms(text: str) -> int | None:
     match = BED_RE.search(text)
-    return int(match.group(1)) if match else None
+    if match:
+        return int(match.group(1))
+    card_match = re.search(
+        r"\b(?:flat|apartment|house|maisonette|property|bungalow|terraced|detached|semi-detached)\s+([2-8])\s+[1-9]\b",
+        text,
+        re.IGNORECASE,
+    )
+    return int(card_match.group(1)) if card_match else None
 
 
 def extract_listing_address(title: str, snippet: str) -> str:
@@ -846,7 +894,7 @@ def closest_watched_station(origin: str, google_key: str, preferred_station: str
 def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | None, int | None]:
     text = f"{title} {snippet}"
     lowered = text.lower()
-    if any(term in lowered for term in ["room to rent", "house share", "flat share", "shared accommodation", "student accommodation"]):
+    if any(term in lowered for term in ["room to rent", "house share", "flat share", "shared accommodation", "student accommodation", "double room", "single room", "large bright bedroom", "room in a"]):
         return False, "shared/student accommodation", None, None
     if "concierge" in lowered:
         return False, "contains concierge", None, None
@@ -914,14 +962,20 @@ def add_query_params(url: str, **params: Any) -> str:
     return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(existing)))
 
 
+def portal_location_slug(station: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", station.lower()).strip("-")
+
+
 def playwright_search_url(domain: str, station: str, page_index: int) -> str:
     term = f"{station} station"
+    slug = portal_location_slug(station)
     if domain == "rightmove.co.uk":
-        url = "https://www.rightmove.co.uk/property-to-rent/find.html"
+        url = "https://www.rightmove.co.uk/property-to-rent/search.html"
         return add_query_params(
             url,
-            searchLocation=term,
-            useLocationIdentifier="false",
+            searchLocation="London",
+            locationIdentifier="REGION^87490",
+            useLocationIdentifier="true",
             radius="0.5",
             minBedrooms=2,
             maxBedrooms=8,
@@ -929,13 +983,13 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str:
             includeLetAgreed="false",
             furnishTypes="furnished",
             dontShow="houseShare,student,retirement",
+            keywords=term,
             index=page_index * 24,
         )
     if domain == "zoopla.co.uk":
-        url = "https://www.zoopla.co.uk/to-rent/property/london/"
+        url = f"https://www.zoopla.co.uk/to-rent/property/{slug}-station/"
         return add_query_params(
             url,
-            q=term,
             beds_min=2,
             beds_max=8,
             price_frequency="per_month",
@@ -945,18 +999,8 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str:
             pn=page_index + 1,
         )
     if domain == "onthemarket.com":
-        url = "https://www.onthemarket.com/to-rent/property/london/"
-        return add_query_params(
-            url,
-            **{
-                "search-location": term,
-                "min-bedrooms": 2,
-                "max-bedrooms": 8,
-                "max-price": 14000,
-                "furnished": "true",
-                "page": page_index + 1,
-            },
-        )
+        url = f"https://www.onthemarket.com/to-rent/property/{slug}-station/"
+        return add_query_params(url, page=page_index + 1) if page_index else url
     if domain == "openrent.co.uk":
         url = "https://www.openrent.co.uk/properties-to-rent/london"
         return add_query_params(
@@ -983,10 +1027,20 @@ def scan_backend() -> str:
     return os.environ.get(SCAN_BACKEND_ENV, "playwright").strip().lower() or "playwright"
 
 
+def playwright_should_verify_detail_pages() -> bool:
+    return os.environ.get(PLAYWRIGHT_VERIFY_DETAIL_PAGES_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def playwright_collect_links(page: Any) -> list[dict[str, str]]:
     return page.evaluate(
         """
         () => {
+          const slugify = (value) => (value || '')
+            .toLowerCase()
+            .replace(/&/g, ' and ')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 90) || 'listing';
           const anchors = Array.from(document.querySelectorAll('a[href]'));
           const rows = [];
           for (const anchor of anchors) {
@@ -1002,20 +1056,90 @@ def playwright_collect_links(page: Any) -> list[dict[str, str]]:
               date: ''
             });
           }
+          if (location.hostname.includes('openrent.co.uk')) {
+            for (const card of Array.from(document.querySelectorAll('a.pli[id^="p"]'))) {
+              const id = card.id.replace(/^p/, '');
+              const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
+              const titleMatch = text.match(/\\d+\\s+Bed\\s+[^,]+,\\s*[^£]+?(?=\\s+(?:We|Available|Beautifully|Marylebone|2 bedrooms|3 bedrooms|4 bedrooms|5 bedrooms|6 bedrooms|7 bedrooms|8 bedrooms|\\d+\\s+Beds|View Details|$))/i);
+              const title = (titleMatch ? titleMatch[0] : text.split(' Last updated ')[0] || text).trim();
+              rows.push({
+                title: title.slice(0, 180),
+                link: `${location.origin}/property-to-rent/london/${slugify(title)}/${id}`,
+                snippet: text.slice(0, 2000),
+                source: location.hostname,
+                date: ''
+              });
+            }
+          }
           return rows;
         }
         """
     )
 
 
+def is_blocked_playwright_detail(title: str, text: str) -> bool:
+    lowered = f"{title} {text}".lower()
+    return any(term in lowered for term in ["just a moment", "checking your browser", "enable javascript and cookies", "access denied"])
+
+
+def playwright_search_diagnostic(page: Any, url: str) -> str:
+    try:
+        return page.evaluate(
+            """
+            (url) => {
+              const anchors = Array.from(document.querySelectorAll('a[href]'))
+                .slice(0, 12)
+                .map((anchor) => `${(anchor.innerText || anchor.getAttribute('aria-label') || '').trim().slice(0, 70)} -> ${anchor.href}`)
+                .filter(Boolean);
+              const body = (document.body ? document.body.innerText : '')
+                .replace(/\\s+/g, ' ')
+                .trim()
+                .slice(0, 500);
+              return [
+                `url=${url}`,
+                `final=${location.href}`,
+                `title=${document.title}`,
+                `body=${body}`,
+                `anchors=${anchors.join(' | ')}`
+              ].join(' || ');
+            }
+            """,
+            url,
+        )
+    except Exception as error:
+        return f"url={url} diagnostic failed: {type(error).__name__}"
+
+
+def playwright_accept_cookies(page: Any) -> None:
+    for label in ["Accept All Cookies", "Accept all", "Accept All", "Accept", "I agree", "Allow all"]:
+        try:
+            page.get_by_role("button", name=label).click(timeout=1500)
+            return
+        except Exception:
+            continue
+    try:
+        page.locator("button:has-text('Accept')").first.click(timeout=1000)
+    except Exception:
+        pass
+
+
+def playwright_prepare_search_results(page: Any, domain: str) -> None:
+    playwright_accept_cookies(page)
+    if domain == "rightmove.co.uk" and "/property-to-rent/search.html" in page.url:
+        for label in ["Search properties", "Search"]:
+            try:
+                page.get_by_role("button", name=label).click(timeout=3000)
+                page.wait_for_timeout(2500)
+                return
+            except Exception:
+                continue
+
+
 def playwright_page_text(context: Any, url: str) -> tuple[str, str]:
     detail_page = context.new_page()
     try:
         detail_page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
-        try:
-            detail_page.locator("button:has-text('Accept')").first.click(timeout=1200)
-        except Exception:
-            pass
+        playwright_accept_cookies(detail_page)
         title = detail_page.title() or ""
         text = detail_page.locator("body").inner_text(timeout=5000)
         return title, compact_text(text, 9000)
@@ -1044,6 +1168,7 @@ def scan_rental_listings_playwright(
     scan_stations = stations or WATCH_STATIONS
     scan_domains = domains or list(WATCH_PORTALS.keys())
     max_pages = max_pages_per_portal_station or PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION
+    verify_detail_pages = playwright_should_verify_detail_pages()
     pages_checked = 0
     detail_pages_checked = 0
 
@@ -1056,6 +1181,7 @@ def scan_rental_listings_playwright(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
             ),
+            viewport={"width": 1440, "height": 1100},
         )
         page = context.new_page()
         try:
@@ -1067,10 +1193,8 @@ def scan_rental_listings_playwright(
                         pages_checked += 1
                         try:
                             page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
-                            try:
-                                page.locator("button:has-text('Accept')").first.click(timeout=1200)
-                            except Exception:
-                                pass
+                            page.wait_for_timeout(1500)
+                            playwright_prepare_search_results(page, domain)
                             page_results = playwright_collect_links(page)
                         except Exception as error:
                             key = f"playwright search error: {station} {domain}: {type(error).__name__}"
@@ -1089,6 +1213,10 @@ def scan_rental_listings_playwright(
                             new_detail_links.append(result)
 
                         if not new_detail_links:
+                            skipped["no detail links on search page"] = skipped.get("no detail links on search page", 0) + 1
+                            samples = skipped_samples.setdefault("no detail links on search page", [])
+                            if len(samples) < 8:
+                                samples.append(playwright_search_diagnostic(page, url))
                             break
 
                         for result in new_detail_links:
@@ -1101,21 +1229,34 @@ def scan_rental_listings_playwright(
                                 skipped["already sent"] = skipped.get("already sent", 0) + 1
                                 continue
 
-                            detail_pages_checked += 1
-                            try:
-                                detail_title, detail_text = playwright_page_text(context, link)
-                                title = detail_title or result.get("title", "")
-                                snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)}"
-                                lowered = snippet.lower()
-                                if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
-                                    skipped["not live"] = skipped.get("not live", 0) + 1
-                                    continue
-                            except Exception as error:
-                                skipped["detail page blocked"] = skipped.get("detail page blocked", 0) + 1
-                                samples = skipped_samples.setdefault("detail page blocked", [])
-                                if len(samples) < 8:
-                                    samples.append(f"{link} ({type(error).__name__})")
+                            result["title"] = title_from_result_text(result.get("title", ""), result.get("snippet", ""))
+                            search_snippet = f"{result.get('snippet', '')} furnished long let to rent pcm"
+                            pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(result.get("title", ""), search_snippet)
+                            if not pre_ok:
+                                skipped[pre_reason] = skipped.get(pre_reason, 0) + 1
                                 continue
+
+                            title = result.get("title", "")
+                            snippet = search_snippet
+                            live_status = "search-card"
+                            if verify_detail_pages:
+                                detail_pages_checked += 1
+                                try:
+                                    detail_title, detail_text = playwright_page_text(context, link)
+                                    if not is_blocked_playwright_detail(detail_title, detail_text):
+                                        title = detail_title or title
+                                        snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
+                                        live_status = "verified"
+                                    lowered = snippet.lower()
+                                    if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
+                                        skipped["not live"] = skipped.get("not live", 0) + 1
+                                        continue
+                                except Exception as error:
+                                    skipped["detail page blocked"] = skipped.get("detail page blocked", 0) + 1
+                                    samples = skipped_samples.setdefault("detail page blocked", [])
+                                    if len(samples) < 8:
+                                        samples.append(f"{link} ({type(error).__name__})")
+                                    continue
 
                             ok, reason, beds, rent = passes_scanner_filters(title, snippet)
                             if not ok:
@@ -1161,7 +1302,7 @@ def scan_rental_listings_playwright(
                                     "address": address,
                                     "beds": beds,
                                     "rent": rent,
-                                    "live_status": "verified",
+                                    "live_status": live_status,
                                     "fingerprint": fingerprint,
                                 }
                             )
@@ -1287,6 +1428,7 @@ def scan_rental_listings(
             title = result.get("title", "")
             snippet = result.get("snippet", "")
             title, snippet, live_status = enrich_scanner_text(link, title, snippet)
+            title = title_from_result_text(title, snippet)
             if live_status == "not_live":
                 skipped["not live"] = skipped.get("not live", 0) + 1
                 continue
