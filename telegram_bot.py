@@ -96,6 +96,38 @@ PORTAL_DETAIL_SEARCH_CLAUSES = {
     "openrent.co.uk": "site:openrent.co.uk inurl:property-to-rent",
 }
 
+RIGHTMOVE_LOCATION_IDS = {
+    "Kensington Olympia": "STATION^5011",
+    "Marble Arch": "STATION^6032",
+    "Bond Street": "STATION^1166",
+    "Baker Street": "STATION^488",
+    "Regent Park": "STATION^7658",
+    "Oxford Circus": "STATION^6953",
+    "Covent Garden": "REGION^87501",
+    "Holborn": "STATION^4668",
+    "Charing Cross": "STATION^1936",
+}
+
+STATION_SLUGS = {
+    "Kensington Olympia": "kensington-olympia",
+    "Bayswater": "bayswater",
+    "Lancaster Gate": "lancaster-gate",
+    "Gloucester Road": "gloucester-road",
+    "South Kensington": "south-kensington",
+    "Marble Arch": "marble-arch",
+    "Bond Street": "bond-street",
+    "Baker Street": "baker-street",
+    "Regent Park": "regents-park",
+    "Oxford Circus": "oxford-circus",
+    "Tottenham Court Road": "tottenham-court-road",
+    "Covent Garden": "covent-garden",
+    "Leicester Square": "leicester-square",
+    "Piccadilly Circus": "piccadilly-circus",
+    "Holborn": "holborn",
+    "Charing Cross": "charing-cross",
+    "Victoria": "victoria",
+}
+
 
 @dataclass(frozen=True)
 class Area:
@@ -552,6 +584,31 @@ def listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station:
     return f"{beds}|{rent_bucket}|{station.lower()}|{'-'.join(tokens)}"
 
 
+def cross_portal_dedup_key(item: dict[str, Any]) -> str:
+    address = normalized_listing_text(item.get("address") or item.get("title") or "")
+    tokens = [
+        token for token in address.split()
+        if token not in {
+            "flat", "apartment", "property", "rent", "london",
+            "marylebone", "mayfair", "fitzrovia", "westminster",
+            "regent", "regents", "baker", "street", "station",
+        }
+    ][:8]
+    rent_bucket = round(int(item.get("rent") or 0) / 50) * 50
+    return f"{item.get('beds')}|{rent_bucket}|{item.get('station', '').lower()}|{'-'.join(tokens)}"
+
+
+def dedupe_scanner_matches(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    priority = {"OnTheMarket": 0, "Zoopla": 1, "Rightmove": 2, "OpenRent": 3}
+    best: dict[str, dict[str, Any]] = {}
+    for item in matches:
+        key = cross_portal_dedup_key(item)
+        current = best.get(key)
+        if current is None or priority.get(item.get("portal", ""), 9) < priority.get(current.get("portal", ""), 9):
+            best[key] = item
+    return list(best.values())
+
+
 def format_override_result(override: dict[str, Any]) -> str:
     return (
         f"<b>{html.escape(override['name'])}</b>\n"
@@ -809,7 +866,7 @@ def is_detail_listing_url(url: str) -> bool:
     if "onthemarket.com" in host:
         return "/details/" in path
     if "openrent.co.uk" in host:
-        return "/property-to-rent/" in path
+        return "/property-to-rent/" in path or re.fullmatch(r"/\d+", path) is not None
     return False
 
 
@@ -840,6 +897,13 @@ def extract_listing_address(title: str, snippet: str) -> str:
                 return f"{address}, London"
     cleaned_title = clean_subject_name(title)
     return f"{cleaned_title}, London" if cleaned_title else ""
+
+
+def scanner_address_from_title(title: str, snippet: str) -> str:
+    cleaned = clean_listing_title(title)
+    if re.search(r"\b[A-Z]{1,2}\d{1,2}[A-Z]?\b", cleaned) or "," in cleaned:
+        return f"{cleaned}, London" if "london" not in cleaned.lower() else cleaned
+    return extract_listing_address(title, snippet)
 
 
 def station_destination(station: str) -> str:
@@ -963,54 +1027,69 @@ def add_query_params(url: str, **params: Any) -> str:
 
 
 def portal_location_slug(station: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", station.lower()).strip("-")
+    return STATION_SLUGS.get(station, re.sub(r"[^a-z0-9]+", "-", station.lower()).strip("-"))
 
 
-def playwright_search_url(domain: str, station: str, page_index: int) -> str:
-    term = f"{station} station"
+def playwright_search_url(domain: str, station: str, page_index: int) -> str | None:
     slug = portal_location_slug(station)
     if domain == "rightmove.co.uk":
-        url = "https://www.rightmove.co.uk/property-to-rent/search.html"
+        loc_id = RIGHTMOVE_LOCATION_IDS.get(station)
+        if not loc_id:
+            return None
+        url = "https://www.rightmove.co.uk/property-to-rent/find.html"
+        radius = "0.5" if "STATION" in loc_id else None
         return add_query_params(
             url,
-            searchLocation="London",
-            locationIdentifier="REGION^87490",
-            useLocationIdentifier="true",
-            radius="0.5",
+            locationIdentifier=loc_id,
+            radius=radius,
             minBedrooms=2,
             maxBedrooms=8,
             maxPrice=14000,
             includeLetAgreed="false",
             furnishTypes="furnished",
             dontShow="houseShare,student,retirement",
-            keywords=term,
+            sortType=6,
             index=page_index * 24,
+            channel="RENT",
         )
     if domain == "zoopla.co.uk":
-        url = f"https://www.zoopla.co.uk/to-rent/property/{slug}-station/"
+        url = f"https://www.zoopla.co.uk/to-rent/property/station/tube/{slug}/"
         return add_query_params(
             url,
             beds_min=2,
             beds_max=8,
-            price_frequency="per_month",
             price_max=14000,
             furnished_state="furnished",
             include_shared_accommodation="false",
+            radius="0.5",
+            results_sort="newest_listings",
             pn=page_index + 1,
         )
     if domain == "onthemarket.com":
         url = f"https://www.onthemarket.com/to-rent/property/{slug}-station/"
-        return add_query_params(url, page=page_index + 1) if page_index else url
-    if domain == "openrent.co.uk":
-        url = "https://www.openrent.co.uk/properties-to-rent/london"
         return add_query_params(
             url,
-            term=term,
+            **{
+                "min-bedrooms": 2,
+                "max-bedrooms": 8,
+                "max-price": 14000,
+                "furnishing": "furnished",
+                "include-let-agreed": "false",
+                "radius": "0.5",
+                "page": page_index + 1,
+            },
+        )
+    if domain == "openrent.co.uk":
+        url = f"https://www.openrent.co.uk/properties-to-rent/{slug}-london"
+        return add_query_params(
+            url,
+            term=f"{station}, London",
             bedrooms_min=2,
             bedrooms_max=8,
-            prices_max=14000,
-            furnishing="Furnished",
-            page=page_index + 1,
+            max_rent=14000,
+            furnishedType=1,
+            isLive="true",
+            radius="0.5",
         )
     return f"https://www.{domain}/"
 
@@ -1029,6 +1108,22 @@ def scan_backend() -> str:
 
 def playwright_should_verify_detail_pages() -> bool:
     return os.environ.get(PLAYWRIGHT_VERIFY_DETAIL_PAGES_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def playwright_new_context(browser: Any) -> Any:
+    return browser.new_context(
+        locale="en-GB",
+        timezone_id="Europe/London",
+        user_agent=(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        viewport={"width": 1280, "height": 900},
+        extra_http_headers={
+            "Accept-Language": "en-GB,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        },
+    )
 
 
 def playwright_collect_links(page: Any) -> list[dict[str, str]]:
@@ -1075,6 +1170,78 @@ def playwright_collect_links(page: Any) -> list[dict[str, str]]:
         }
         """
     )
+
+
+def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, str]]:
+    if domain == "rightmove.co.uk":
+        return page.evaluate(
+            """
+            () => Array.from(document.querySelectorAll('div[class*="PropertyCard_propertyCardContainerWrapper"], div[class*="propertyCard"], article'))
+              .map(card => {
+                const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
+                if (!text || /let\\s+agreed/i.test(text)) return null;
+                const link = card.querySelector('a[href*="/properties/"]');
+                if (!link) return null;
+                const address = (card.querySelector('address, [class*="Address"], [class*="address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
+                const title = address || card.querySelector('h2, [class*="Title"], [class*="title"]')?.innerText || text.slice(0, 100);
+                return {title, link: link.href, snippet: text, source: location.hostname, date: ''};
+              }).filter(Boolean)
+            """
+        )
+    if domain == "zoopla.co.uk":
+        return page.evaluate(
+            """
+            () => Array.from(document.querySelectorAll('a[data-testid*="listing"]'))
+              .map(card => {
+                const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
+                const href = card.href || '';
+                if (!href || href.includes('/new-homes/') || href.includes('/details/contact/') || /let\\s+agreed/i.test(text)) return null;
+                const address = (card.querySelector('[data-testid*="address"], [class*="address"], [class*="Address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
+                const title = address || card.querySelector('[data-testid*="title"], h2, [class*="title"], [class*="Title"]')?.innerText || text.slice(0, 100);
+                return {title, link: href, snippet: text, source: location.hostname, date: ''};
+              }).filter(Boolean)
+            """
+        )
+    if domain == "onthemarket.com":
+        return page.evaluate(
+            """
+            () => Array.from(document.querySelectorAll('article[data-component]'))
+              .map(card => {
+                const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
+                if (!text || /let\\s+agreed/i.test(text)) return null;
+                const link = Array.from(card.querySelectorAll('a[href*="/details/"]')).find(a => a.href);
+                if (!link) return null;
+                const address = (card.querySelector('address')?.innerText || '').replace(/\\s+/g, ' ').trim();
+                return {title: address || text.slice(0, 100), link: link.href, snippet: text, source: location.hostname, date: ''};
+              }).filter(Boolean)
+            """
+        )
+    if domain == "openrent.co.uk":
+        return page.evaluate(
+            """
+            () => {
+              const slugify = (value) => (value || '')
+                .toLowerCase()
+                .replace(/&/g, ' and ')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .slice(0, 90) || 'listing';
+              return Array.from(document.querySelectorAll('a.pli[id^="p"], div.property-result a'))
+                .map(card => {
+                  const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
+                  if (!text || /let\\s+agreed/i.test(text)) return null;
+                  const id = (card.id || '').replace(/^p/, '');
+                  let href = card.href || '';
+                  const titleMatch = text.match(/\\d+\\s+Bed\\s+[^,]+,\\s*[^£]+?(?=\\s+(?:We|Available|Beautifully|Modern|This|A\\s|\\d+\\s+Beds|View Details|$))/i);
+                  const title = (titleMatch ? titleMatch[0] : text.split(' Last updated ')[0] || text).trim();
+                  if (!href && id) href = `${location.origin}/property-to-rent/london/${slugify(title)}/${id}`;
+                  if (!href) return null;
+                  return {title, link: href, snippet: text, source: location.hostname, date: ''};
+                }).filter(Boolean);
+            }
+            """
+        )
+    return playwright_collect_links(page)
 
 
 def is_blocked_playwright_detail(title: str, text: str) -> bool:
@@ -1125,14 +1292,17 @@ def playwright_accept_cookies(page: Any) -> None:
 
 def playwright_prepare_search_results(page: Any, domain: str) -> None:
     playwright_accept_cookies(page)
-    if domain == "rightmove.co.uk" and "/property-to-rent/search.html" in page.url:
-        for label in ["Search properties", "Search"]:
-            try:
-                page.get_by_role("button", name=label).click(timeout=3000)
-                page.wait_for_timeout(2500)
-                return
-            except Exception:
-                continue
+    if domain == "onthemarket.com":
+        try:
+            page.evaluate("const b = document.getElementById('ccc-recommended-settings'); if (b) b.click();")
+        except Exception:
+            pass
+    try:
+        page.evaluate("window.scrollTo(0, 500)")
+        page.wait_for_timeout(500)
+        page.evaluate("window.scrollTo(0, 1000)")
+    except Exception:
+        pass
 
 
 def playwright_page_text(context: Any, url: str) -> tuple[str, str]:
@@ -1173,32 +1343,36 @@ def scan_rental_listings_playwright(
     detail_pages_checked = 0
 
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context(
-            locale="en-GB",
-            timezone_id="Europe/London",
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
-            ),
-            viewport={"width": 1440, "height": 1100},
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
-        page = context.new_page()
         try:
             for station in scan_stations:
                 for domain in scan_domains:
                     seen_page_links: set[str] = set()
                     for page_index in range(max_pages):
                         url = playwright_search_url(domain, station, page_index)
+                        if not url:
+                            skipped[f"no station URL for {domain}"] = skipped.get(f"no station URL for {domain}", 0) + 1
+                            break
                         pages_checked += 1
+                        context = playwright_new_context(browser)
+                        page = context.new_page()
                         try:
                             page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
                             page.wait_for_timeout(1500)
                             playwright_prepare_search_results(page, domain)
-                            page_results = playwright_collect_links(page)
+                            page_results = playwright_collect_portal_results(page, domain)
                         except Exception as error:
                             key = f"playwright search error: {station} {domain}: {type(error).__name__}"
                             skipped[key] = skipped.get(key, 0) + 1
+                            context.close()
                             break
 
                         new_detail_links = []
@@ -1217,99 +1391,103 @@ def scan_rental_listings_playwright(
                             samples = skipped_samples.setdefault("no detail links on search page", [])
                             if len(samples) < 8:
                                 samples.append(playwright_search_diagnostic(page, url))
+                            context.close()
                             break
 
-                        for result in new_detail_links:
-                            link = result["link"]
-                            canonical = canonical_listing_url(link)
-                            if not canonical or canonical in seen_this_scan:
-                                continue
-                            seen_this_scan.add(canonical)
-                            if canonical in sent_urls and not include_seen:
-                                skipped["already sent"] = skipped.get("already sent", 0) + 1
-                                continue
+                        try:
+                            for result in new_detail_links:
+                                link = result["link"]
+                                canonical = canonical_listing_url(link)
+                                if not canonical or canonical in seen_this_scan:
+                                    continue
+                                seen_this_scan.add(canonical)
+                                if canonical in sent_urls and not include_seen:
+                                    skipped["already sent"] = skipped.get("already sent", 0) + 1
+                                    continue
 
-                            result["title"] = title_from_result_text(result.get("title", ""), result.get("snippet", ""))
-                            search_snippet = f"{result.get('snippet', '')} furnished long let to rent pcm"
-                            pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(result.get("title", ""), search_snippet)
-                            if not pre_ok:
-                                skipped[pre_reason] = skipped.get(pre_reason, 0) + 1
-                                continue
+                                result["title"] = title_from_result_text(result.get("title", ""), result.get("snippet", ""))
+                                search_snippet = f"{result.get('snippet', '')} furnished long let to rent pcm"
+                                pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(result.get("title", ""), search_snippet)
+                                if not pre_ok:
+                                    skipped[pre_reason] = skipped.get(pre_reason, 0) + 1
+                                    continue
 
-                            title = result.get("title", "")
-                            snippet = search_snippet
-                            live_status = "search-card"
-                            if verify_detail_pages:
-                                detail_pages_checked += 1
-                                try:
-                                    detail_title, detail_text = playwright_page_text(context, link)
-                                    if not is_blocked_playwright_detail(detail_title, detail_text):
-                                        title = detail_title or title
-                                        snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
-                                        live_status = "verified"
-                                    lowered = snippet.lower()
-                                    if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
-                                        skipped["not live"] = skipped.get("not live", 0) + 1
+                                title = result.get("title", "")
+                                snippet = search_snippet
+                                live_status = "search-card"
+                                if verify_detail_pages:
+                                    detail_pages_checked += 1
+                                    try:
+                                        detail_title, detail_text = playwright_page_text(context, link)
+                                        if not is_blocked_playwright_detail(detail_title, detail_text):
+                                            title = detail_title or title
+                                            snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
+                                            live_status = "verified"
+                                        lowered = snippet.lower()
+                                        if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
+                                            skipped["not live"] = skipped.get("not live", 0) + 1
+                                            continue
+                                    except Exception as error:
+                                        skipped["detail page blocked"] = skipped.get("detail page blocked", 0) + 1
+                                        samples = skipped_samples.setdefault("detail page blocked", [])
+                                        if len(samples) < 8:
+                                            samples.append(f"{link} ({type(error).__name__})")
                                         continue
-                                except Exception as error:
-                                    skipped["detail page blocked"] = skipped.get("detail page blocked", 0) + 1
-                                    samples = skipped_samples.setdefault("detail page blocked", [])
-                                    if len(samples) < 8:
-                                        samples.append(f"{link} ({type(error).__name__})")
-                                    continue
 
-                            ok, reason, beds, rent = passes_scanner_filters(title, snippet)
-                            if not ok:
-                                skipped[reason] = skipped.get(reason, 0) + 1
-                                continue
-                            fingerprint = listing_fingerprint(title, snippet, beds, rent, station)
-                            if fingerprint in seen_fingerprints_this_scan:
-                                skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
-                                continue
-                            if fingerprint in sent_fingerprints and not include_seen:
-                                skipped["already sent property"] = skipped.get("already sent property", 0) + 1
-                                continue
-                            seen_fingerprints_this_scan.add(fingerprint)
-
-                            address = extract_listing_address(title, snippet)
-                            if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
-                                skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
-                                continue
-                            if USE_GOOGLE_MAPS_WALKING_FILTER and not address:
-                                skipped["address not visible"] = skipped.get("address not visible", 0) + 1
-                                continue
-                            if USE_GOOGLE_MAPS_WALKING_FILTER:
-                                closest = closest_watched_station(address, google_maps_key, preferred_station=station)
-                                if not closest:
-                                    skipped["walking distance unavailable"] = skipped.get("walking distance unavailable", 0) + 1
+                                ok, reason, beds, rent = passes_scanner_filters(title, snippet)
+                                if not ok:
+                                    skipped[reason] = skipped.get(reason, 0) + 1
                                     continue
-                                if closest["minutes"] > MAX_WALKING_MINUTES:
-                                    skipped["over 8 min walk"] = skipped.get("over 8 min walk", 0) + 1
+                                fingerprint = listing_fingerprint(title, snippet, beds, rent, station)
+                                if fingerprint in seen_fingerprints_this_scan:
+                                    skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
                                     continue
-                            else:
-                                closest = {"station": station, "minutes": None}
+                                if fingerprint in sent_fingerprints and not include_seen:
+                                    skipped["already sent property"] = skipped.get("already sent property", 0) + 1
+                                    continue
+                                seen_fingerprints_this_scan.add(fingerprint)
 
-                            matches.append(
-                                {
-                                    "title": clean_listing_title(title),
-                                    "snippet": compact_text(snippet, 180),
-                                    "link": link,
-                                    "canonical": canonical,
-                                    "portal": portal_from_link(link),
-                                    "station": station,
-                                    "closest_station": closest["station"],
-                                    "walking_minutes": closest["minutes"],
-                                    "address": address,
-                                    "beds": beds,
-                                    "rent": rent,
-                                    "live_status": live_status,
-                                    "fingerprint": fingerprint,
-                                }
-                            )
+                                address = scanner_address_from_title(title, snippet)
+                                if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
+                                    skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
+                                    continue
+                                if USE_GOOGLE_MAPS_WALKING_FILTER and not address:
+                                    skipped["address not visible"] = skipped.get("address not visible", 0) + 1
+                                    continue
+                                if USE_GOOGLE_MAPS_WALKING_FILTER:
+                                    closest = closest_watched_station(address, google_maps_key, preferred_station=station)
+                                    if not closest:
+                                        skipped["walking distance unavailable"] = skipped.get("walking distance unavailable", 0) + 1
+                                        continue
+                                    if closest["minutes"] > MAX_WALKING_MINUTES:
+                                        skipped["over 8 min walk"] = skipped.get("over 8 min walk", 0) + 1
+                                        continue
+                                else:
+                                    closest = {"station": station, "minutes": None}
+
+                                matches.append(
+                                    {
+                                        "title": clean_listing_title(title),
+                                        "snippet": compact_text(snippet, 180),
+                                        "link": link,
+                                        "canonical": canonical,
+                                        "portal": portal_from_link(link),
+                                        "station": station,
+                                        "closest_station": closest["station"],
+                                        "walking_minutes": closest["minutes"],
+                                        "address": address,
+                                        "beds": beds,
+                                        "rent": rent,
+                                        "live_status": live_status,
+                                        "fingerprint": fingerprint,
+                                    }
+                                )
+                        finally:
+                            context.close()
         finally:
-            context.close()
             browser.close()
 
+    matches = dedupe_scanner_matches(matches)
     matches.sort(key=lambda item: (item["rent"], item["beds"], item["station"]))
     return matches, {
         "skipped": skipped,
@@ -1448,7 +1626,7 @@ def scan_rental_listings(
                 continue
             seen_fingerprints_this_scan.add(fingerprint)
 
-            address = extract_listing_address(title, snippet)
+            address = scanner_address_from_title(title, snippet)
             if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
                 skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
                 continue
@@ -2527,7 +2705,7 @@ class TelegramBot:
             matches, meta = scan_rental_listings_playwright(
                 include_seen=True,
                 stations=["Baker Street"],
-                domains=["rightmove.co.uk", "openrent.co.uk"],
+                domains=["rightmove.co.uk", "zoopla.co.uk", "onthemarket.com", "openrent.co.uk"],
                 google_maps_key=google_maps_key,
                 max_pages_per_portal_station=1,
             )
