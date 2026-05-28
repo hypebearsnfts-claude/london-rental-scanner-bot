@@ -54,7 +54,7 @@ MONEY_RE = re.compile(
 )
 SQFT_RE = re.compile(r"\b([0-9]{3,4})\s*(?:sq\.?\s*ft|sqft|square feet)\b", re.IGNORECASE)
 SQFT_REVERSED_RE = re.compile(r"\b(?:sq\.?\s*ft|sqft|square feet)\s*:?\s*([0-9]{3,4})\b", re.IGNORECASE)
-BED_RE = re.compile(r"\b([1-8])\s*(?:bed|bedroom|br)\b", re.IGNORECASE)
+BED_RE = re.compile(r"\b([1-8])\s*(?:bed|beds|bedroom|bedrooms|br)\b", re.IGNORECASE)
 
 WATCH_STATIONS = [
     "Kensington Olympia",
@@ -138,6 +138,10 @@ STATION_SLUGS = {
     "Holborn": "holborn",
     "Charing Cross": "charing-cross",
     "Victoria": "victoria",
+}
+
+ONTHEMARKET_LOCATION_SLUGS = {
+    "Victoria": "london-victoria",
 }
 
 
@@ -883,15 +887,19 @@ def is_detail_listing_url(url: str) -> bool:
 
 
 def extract_bedrooms(text: str) -> int | None:
+    if re.search(r"\bstudio\b", text, re.IGNORECASE):
+        return 0
     match = BED_RE.search(text)
     if match:
         return int(match.group(1))
     card_match = re.search(
-        r"\b(?:flat|apartment|house|maisonette|property|bungalow|terraced|detached|semi-detached)\s+([2-8])\s+[1-9]\b",
+        r"\b(?:to rent|flat|apartment|house|maisonette|property|bungalow|terraced|detached|semi-detached|penthouse|duplex)\s+([1-8])\s+[1-9]\b",
         text,
         re.IGNORECASE,
     )
-    return int(card_match.group(1)) if card_match else None
+    if card_match:
+        return int(card_match.group(1))
+    return None
 
 
 def extract_listing_address(title: str, snippet: str) -> str:
@@ -916,6 +924,17 @@ def scanner_address_from_title(title: str, snippet: str) -> str:
     if re.search(r"\b[A-Z]{1,2}\d{1,2}[A-Z]?\b", cleaned) or "," in cleaned:
         return f"{cleaned}, London" if "london" not in cleaned.lower() else cleaned
     return extract_listing_address(title, snippet)
+
+
+def looks_outside_watched_london_area(text: str) -> bool:
+    lowered = text.lower()
+    if any(place in lowered for place in ["greater manchester", "manchester", "salford"]):
+        return True
+    postcode_match = re.search(r"\b([A-Z]{1,2})\d{1,2}[A-Z]?\b", text.upper())
+    if not postcode_match:
+        return False
+    outward_prefix = postcode_match.group(1)
+    return outward_prefix not in {"W", "NW", "SW", "WC", "EC", "SE"}
 
 
 def station_destination(station: str) -> str:
@@ -980,6 +999,8 @@ def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | N
         return False, "not live", None, None
     if "short let" in lowered or "short-let" in lowered:
         return False, "short let", None, None
+    if looks_outside_watched_london_area(text):
+        return False, "outside watched London area", None, None
     if "unfurnished" in lowered:
         return False, "unfurnished", None, None
     if "part furnished" in lowered or "part-furnished" in lowered:
@@ -1078,6 +1099,7 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             pn=page_index + 1,
         )
     if domain == "onthemarket.com":
+        slug = ONTHEMARKET_LOCATION_SLUGS.get(station, slug)
         url = f"https://www.onthemarket.com/to-rent/property/{slug}-station/"
         return add_query_params(
             url,
@@ -1192,6 +1214,8 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
               .map(card => {
                 const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                 if (!text || /let\\s+agreed/i.test(text)) return null;
+                if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
+                if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                 const link = card.querySelector('a[href*="/properties/"]');
                 if (!link) return null;
                 const address = (card.querySelector('address, [class*="Address"], [class*="address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
@@ -1208,6 +1232,8 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                 const href = card.href || '';
                 if (!href || href.includes('/new-homes/') || href.includes('/details/contact/') || /let\\s+agreed/i.test(text)) return null;
+                if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
+                if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                 const address = (card.querySelector('[data-testid*="address"], [class*="address"], [class*="Address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
                 const title = address || card.querySelector('[data-testid*="title"], h2, [class*="title"], [class*="Title"]')?.innerText || text.slice(0, 100);
                 return {title, link: href, snippet: text, source: location.hostname, date: ''};
@@ -1221,6 +1247,8 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
               .map(card => {
                 const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                 if (!text || /let\\s+agreed/i.test(text)) return null;
+                if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
+                if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                 const link = Array.from(card.querySelectorAll('a[href*="/details/"]')).find(a => a.href);
                 if (!link) return null;
                 const address = (card.querySelector('address')?.innerText || '').replace(/\\s+/g, ' ').trim();
@@ -1242,6 +1270,8 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 .map(card => {
                   const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                   if (!text || /let\\s+agreed/i.test(text)) return null;
+                  if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
+                  if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                   const id = (card.id || '').replace(/^p/, '');
                   let href = card.href || '';
                   const titleMatch = text.match(/\\d+\\s+Bed\\s+[^,]+,\\s*[^£]+?(?=\\s+(?:We|Available|Beautifully|Modern|This|A\\s|\\d+\\s+Beds|View Details|$))/i);
@@ -1422,6 +1452,15 @@ def scan_rental_listings_playwright(
                                 pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(result.get("title", ""), search_snippet)
                                 if not pre_ok:
                                     skipped[pre_reason] = skipped.get(pre_reason, 0) + 1
+                                    if pre_reason in {"bedrooms not visible", "rent not visible"}:
+                                        samples = skipped_samples.setdefault(pre_reason, [])
+                                        if len(samples) < 8:
+                                            samples.append(
+                                                compact_text(
+                                                    f"{domain} | {result.get('title', '')} | {result.get('snippet', '')}",
+                                                    500,
+                                                )
+                                            )
                                     continue
 
                                 title = result.get("title", "")
@@ -1449,6 +1488,10 @@ def scan_rental_listings_playwright(
                                 ok, reason, beds, rent = passes_scanner_filters(title, snippet)
                                 if not ok:
                                     skipped[reason] = skipped.get(reason, 0) + 1
+                                    if reason in {"bedrooms not visible", "rent not visible"}:
+                                        samples = skipped_samples.setdefault(reason, [])
+                                        if len(samples) < 8:
+                                            samples.append(compact_text(f"{link} | {title} | {snippet}", 500))
                                     continue
                                 fingerprint = listing_fingerprint(title, snippet, beds, rent, station)
                                 if fingerprint in seen_fingerprints_this_scan:
