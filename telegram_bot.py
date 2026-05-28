@@ -1690,12 +1690,13 @@ def format_scanner_listing(item: dict[str, Any]) -> str:
         if item.get("walking_minutes") is not None
         else f"station match: {html.escape(item['closest_station'])}"
     )
+    link = html.escape(item["link"])
     return "\n".join(
         [
             f"<b>{html.escape(item['title'])}</b>",
             f"{item['beds']} bed | {money(item['rent'])} pcm | {html.escape(item['portal'])}",
             station_line,
-            f'<a href="{html.escape(item["link"])}">Open listing</a>',
+            link,
         ]
     )
 
@@ -2736,7 +2737,11 @@ class TelegramBot:
             )
         log_event(f"test_scan chat={chat_id} matches={len(matches)} meta={meta}")
         sample = "\n".join(
-            f"• {html.escape(item['title'])} | {item['beds']} bed | {money(item['rent'])} | {html.escape(item['portal'])}"
+            (
+                f"• {html.escape(item['title'])} | {item['beds']} bed | "
+                f"{money(item['rent'])} | {html.escape(item['portal'])}\n"
+                f"{html.escape(item['link'])}"
+            )
             for item in matches[:5]
         ) or "No sample matches."
         self.send_message(
