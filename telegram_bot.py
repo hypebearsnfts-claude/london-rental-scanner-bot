@@ -37,6 +37,8 @@ LOG_FILE = "bot.log"
 SCANNER_STATE_FILE = "scanner_state.json"
 LOCAL_TZ = ZoneInfo("Europe/London")
 DAILY_SCAN_HOUR = 12
+SCANNER_LISTINGS_PER_MESSAGE = 6
+TELEGRAM_SEND_PAUSE_SECONDS = 1.05
 SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
@@ -1744,6 +1746,10 @@ def format_scanner_listing(item: dict[str, Any]) -> str:
     )
 
 
+def format_scanner_listing_batch(items: list[dict[str, Any]]) -> str:
+    return "\n\n".join(format_scanner_listing(item) for item in items)
+
+
 def scan_error_count(meta: dict[str, Any]) -> int:
     return sum(value for key, value in meta.get("skipped", {}).items() if key.startswith("search error:"))
 
@@ -2681,15 +2687,28 @@ class TelegramBot:
         return parsed
 
     def send_message(self, chat_id: int, text: str) -> None:
-        self.api(
-            "sendMessage",
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "HTML",
-                "disable_web_page_preview": True,
-            },
-        )
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+        for attempt in range(3):
+            try:
+                self.api("sendMessage", payload)
+                return
+            except urllib.error.HTTPError as error:
+                if error.code != 429 or attempt == 2:
+                    raise
+                retry_after = 5
+                try:
+                    body = error.read().decode("utf-8")
+                    parsed = json.loads(body)
+                    retry_after = int(parsed.get("parameters", {}).get("retry_after", retry_after))
+                except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+                    pass
+                log_event(f"telegram_rate_limit retry_after={retry_after}")
+                time.sleep(retry_after + 1)
 
     def send_typing(self, chat_id: int) -> None:
         self.api("sendChatAction", {"chat_id": chat_id, "action": "typing"}, timeout=10)
@@ -2737,12 +2756,14 @@ class TelegramBot:
         state = load_scanner_state()
         sent_urls = set(state.get("sent_urls", []))
         sent_fingerprints = set(state.get("sent_fingerprints", []))
-        for item in matches:
-            self.send_message(chat_id, format_scanner_listing(item))
-            sent_urls.add(item["canonical"])
-            if item.get("fingerprint"):
-                sent_fingerprints.add(item["fingerprint"])
-            time.sleep(0.08)
+        for start in range(0, len(matches), SCANNER_LISTINGS_PER_MESSAGE):
+            batch = matches[start:start + SCANNER_LISTINGS_PER_MESSAGE]
+            self.send_message(chat_id, format_scanner_listing_batch(batch))
+            for item in batch:
+                sent_urls.add(item["canonical"])
+                if item.get("fingerprint"):
+                    sent_fingerprints.add(item["fingerprint"])
+            time.sleep(TELEGRAM_SEND_PAUSE_SECONDS)
         state["sent_urls"] = sorted(sent_urls)
         state["sent_fingerprints"] = sorted(sent_fingerprints)
         save_scanner_state(state)
