@@ -111,6 +111,7 @@ SCANNER_BLACKLISTED_KEYWORDS = [
 ]
 
 RIGHTMOVE_LOCATION_IDS = {
+    # Copied from the reference scraper's Rightmove AREAS map where available.
     "Kensington Olympia": "STATION^5011",
     "Marble Arch": "STATION^6032",
     "Bond Street": "STATION^1166",
@@ -599,7 +600,7 @@ def listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station:
     text = normalized_listing_text(f"{title} {snippet}")
     tokens = [token for token in text.split() if len(token) > 2][:18]
     rent_bucket = round(rent / 25) * 25
-    return f"{beds}|{rent_bucket}|{station.lower()}|{'-'.join(tokens)}"
+    return f"{beds}|{rent_bucket}|{'-'.join(tokens)}"
 
 
 def cross_portal_dedup_key(item: dict[str, Any]) -> str:
@@ -613,7 +614,7 @@ def cross_portal_dedup_key(item: dict[str, Any]) -> str:
         }
     ][:8]
     rent_bucket = round(int(item.get("rent") or 0) / 50) * 50
-    return f"{item.get('beds')}|{rent_bucket}|{item.get('station', '').lower()}|{'-'.join(tokens)}"
+    return f"{item.get('beds')}|{rent_bucket}|{'-'.join(tokens)}"
 
 
 def dedupe_scanner_matches(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1381,7 +1382,7 @@ def scan_rental_listings_playwright(
 
     scan_stations = stations or WATCH_STATIONS
     scan_domains = domains or list(WATCH_PORTALS.keys())
-    max_pages = max_pages_per_portal_station or PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION
+    max_pages = max_pages_per_portal_station
     verify_detail_pages = playwright_should_verify_detail_pages()
     pages_checked = 0
     detail_pages_checked = 0
@@ -1400,7 +1401,8 @@ def scan_rental_listings_playwright(
             for station in scan_stations:
                 for domain in scan_domains:
                     seen_page_links: set[str] = set()
-                    for page_index in range(max_pages):
+                    page_index = 0
+                    while max_pages is None or page_index < max_pages:
                         url = playwright_search_url(domain, station, page_index)
                         if not url:
                             skipped[f"no station URL for {domain}"] = skipped.get(f"no station URL for {domain}", 0) + 1
@@ -1431,10 +1433,12 @@ def scan_rental_listings_playwright(
                             new_detail_links.append(result)
 
                         if not new_detail_links:
-                            skipped["no detail links on search page"] = skipped.get("no detail links on search page", 0) + 1
-                            samples = skipped_samples.setdefault("no detail links on search page", [])
-                            if len(samples) < 8:
-                                samples.append(playwright_search_diagnostic(page, url))
+                            reason = "end of search results" if page_index > 0 else "no detail links on search page"
+                            skipped[reason] = skipped.get(reason, 0) + 1
+                            if page_index == 0:
+                                samples = skipped_samples.setdefault("no detail links on search page", [])
+                                if len(samples) < 8:
+                                    samples.append(playwright_search_diagnostic(page, url))
                             context.close()
                             break
 
@@ -1541,6 +1545,7 @@ def scan_rental_listings_playwright(
                                 )
                         finally:
                             context.close()
+                        page_index += 1
         finally:
             browser.close()
 
