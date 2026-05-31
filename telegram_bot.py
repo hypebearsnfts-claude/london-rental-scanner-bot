@@ -686,6 +686,13 @@ def listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station:
     return f"{beds}|{rent_bucket}|{'-'.join(tokens)}"
 
 
+def legacy_listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station: str) -> str:
+    text = normalized_listing_text(f"{title} {snippet}")
+    tokens = [token for token in text.split() if len(token) > 2][:18]
+    rent_bucket = round(rent / 25) * 25
+    return f"{beds}|{rent_bucket}|{station.lower()}|{'-'.join(tokens)}"
+
+
 def cross_portal_dedup_key(item: dict[str, Any]) -> str:
     address = normalized_listing_text(item.get("address") or item.get("title") or "")
     tokens = [
@@ -1597,13 +1604,15 @@ def scan_rental_listings_playwright(
                                     continue
                                 address = scanner_address_from_title(title, snippet)
                                 fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
-                                if fingerprint in seen_fingerprints_this_scan:
+                                legacy_fingerprint = legacy_listing_fingerprint(title, snippet, beds, rent, station)
+                                fingerprint_keys = {fingerprint, legacy_fingerprint}
+                                if fingerprint_keys & seen_fingerprints_this_scan:
                                     skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
                                     continue
-                                if fingerprint in sent_fingerprints and not include_seen:
+                                if fingerprint_keys & sent_fingerprints and not include_seen:
                                     skipped["already sent property"] = skipped.get("already sent property", 0) + 1
                                     continue
-                                seen_fingerprints_this_scan.add(fingerprint)
+                                seen_fingerprints_this_scan.update(fingerprint_keys)
 
                                 if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
                                     skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
@@ -1637,6 +1646,7 @@ def scan_rental_listings_playwright(
                                         "rent": rent,
                                         "live_status": live_status,
                                         "fingerprint": fingerprint,
+                                        "legacy_fingerprint": legacy_fingerprint,
                                     }
                                 )
                         finally:
@@ -1777,13 +1787,15 @@ def scan_rental_listings(
                 continue
             address = scanner_address_from_title(title, snippet)
             fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
-            if fingerprint in seen_fingerprints_this_scan:
+            legacy_fingerprint = legacy_listing_fingerprint(title, snippet, beds, rent, station)
+            fingerprint_keys = {fingerprint, legacy_fingerprint}
+            if fingerprint_keys & seen_fingerprints_this_scan:
                 skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
                 continue
-            if fingerprint in sent_fingerprints and not include_seen:
+            if fingerprint_keys & sent_fingerprints and not include_seen:
                 skipped["already sent property"] = skipped.get("already sent property", 0) + 1
                 continue
-            seen_fingerprints_this_scan.add(fingerprint)
+            seen_fingerprints_this_scan.update(fingerprint_keys)
 
             if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
                 skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
@@ -1817,6 +1829,7 @@ def scan_rental_listings(
                     "rent": rent,
                     "live_status": live_status,
                     "fingerprint": fingerprint,
+                    "legacy_fingerprint": legacy_fingerprint,
                 }
             )
 
@@ -2864,6 +2877,8 @@ class TelegramBot:
                 sent_urls.add(item["canonical"])
                 if item.get("fingerprint"):
                     sent_fingerprints.add(item["fingerprint"])
+                if item.get("legacy_fingerprint"):
+                    sent_fingerprints.add(item["legacy_fingerprint"])
             time.sleep(TELEGRAM_SEND_PAUSE_SECONDS)
         state["sent_urls"] = sorted(sent_urls)
         state["sent_fingerprints"] = sorted(sent_fingerprints)
