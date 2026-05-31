@@ -99,6 +99,9 @@ PORTAL_DETAIL_SEARCH_CLAUSES = {
 }
 
 SCANNER_BLACKLISTED_KEYWORDS = [
+    # Copied from the reference bot's keyword/agent blacklist and kept broad:
+    # the catch-all "concierge" is intentional because portals often expose it
+    # only as a small feature/amenity string.
     "concierge",
     "24 hour concierge",
     "24 hours concierge",
@@ -108,6 +111,24 @@ SCANNER_BLACKLISTED_KEYWORDS = [
     "24 hr concierge",
     "24/7 concierge",
     "building concierge",
+    "greater london properties",
+    "foxtons",
+    "savills",
+    "chestertons",
+    "knight frank",
+    "dexters",
+    "tavistock bow",
+    "ila",
+    "219baker",
+    "219 baker",
+    "blueground",
+    "cbre",
+    "glp",
+]
+
+SCANNER_BLACKLISTED_PATTERNS = [
+    re.compile(r"\b24\s*(?:hour|hours|hr|hrs|h|/7)\b.{0,40}\b(?:concierge|porter|security|service|services)\b", re.IGNORECASE),
+    re.compile(r"\b(?:concierge|porter|security|service|services)\b.{0,40}\b24\s*(?:hour|hours|hr|hrs|h|/7)\b", re.IGNORECASE),
 ]
 
 RIGHTMOVE_LOCATION_IDS = {
@@ -596,10 +617,72 @@ def normalized_listing_text(value: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station: str) -> str:
-    text = normalized_listing_text(f"{title} {snippet}")
-    tokens = [token for token in text.split() if len(token) > 2][:18]
-    rent_bucket = round(rent / 25) * 25
+ADDRESS_NOISE_TOKENS = {"the", "a", "of", "and", "in", "at", "london"}
+ADDRESS_GENERIC_TOKENS = {
+    "street", "road", "avenue", "lane", "place", "close", "court",
+    "gardens", "garden", "square", "terrace", "way", "drive", "grove",
+    "crescent", "mews", "walk", "row", "hill", "park",
+}
+
+
+def address_tokens(address: str) -> list[str]:
+    text = html.unescape(address or "").lower()
+    text = re.sub(r"\b[a-z]{1,2}\d{1,2}[a-z]?\s+\d[a-z]{2}\b", " ", text)
+    text = re.sub(r"\b(?:flat|apartment|apt|unit)\s*[\d\w]+\b", " ", text)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    tokens = []
+    for token in text.split():
+        if token in ADDRESS_NOISE_TOKENS:
+            continue
+        if re.fullmatch(r"\d+[a-z]?", token) or len(token) > 2:
+            tokens.append(token)
+    return tokens
+
+
+def address_match(address_a: str, address_b: str) -> bool:
+    tokens_a = address_tokens(address_a)
+    tokens_b = address_tokens(address_b)
+    if not tokens_a or not tokens_b:
+        return False
+
+    def first_number(tokens: list[str]) -> str:
+        for token in tokens:
+            if re.fullmatch(r"\d+[a-z]?", token):
+                return token
+        return ""
+
+    number_a = first_number(tokens_a)
+    number_b = first_number(tokens_b)
+    if number_a and number_b:
+        if number_a != number_b:
+            return False
+        words_a = {token for token in tokens_a if token != number_a and token not in ADDRESS_GENERIC_TOKENS}
+        words_b = {token for token in tokens_b if token != number_b and token not in ADDRESS_GENERIC_TOKENS}
+        return bool(words_a & words_b)
+
+    if len(tokens_a) < 2 or len(tokens_b) < 2:
+        return False
+    return tokens_a[0] == tokens_b[0] and tokens_a[1] == tokens_b[1]
+
+
+def scanner_blacklist_hit(text: str) -> bool:
+    normalized = normalized_listing_text(text)
+    normalized_tokens = set(normalized.split())
+    for term in SCANNER_BLACKLISTED_KEYWORDS:
+        normalized_term = normalized_listing_text(term)
+        if len(normalized_term) <= 4 and " " not in normalized_term:
+            if normalized_term in normalized_tokens:
+                return True
+        elif normalized_term in normalized:
+            return True
+    return any(pattern.search(text) for pattern in SCANNER_BLACKLISTED_PATTERNS)
+
+
+def listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station: str, address: str = "") -> str:
+    text = normalized_listing_text(address or f"{title} {snippet}")
+    tokens = [token for token in text.split() if len(token) > 2 and token not in ADDRESS_GENERIC_TOKENS][:12]
+    rent_bucket = round(rent / 50) * 50
     return f"{beds}|{rent_bucket}|{'-'.join(tokens)}"
 
 
@@ -619,13 +702,26 @@ def cross_portal_dedup_key(item: dict[str, Any]) -> str:
 
 def dedupe_scanner_matches(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
     priority = {"OnTheMarket": 0, "Zoopla": 1, "Rightmove": 2, "OpenRent": 3}
-    best: dict[str, dict[str, Any]] = {}
+    kept: list[dict[str, Any]] = []
     for item in matches:
-        key = cross_portal_dedup_key(item)
-        current = best.get(key)
-        if current is None or priority.get(item.get("portal", ""), 9) < priority.get(current.get("portal", ""), 9):
-            best[key] = item
-    return list(best.values())
+        duplicate_index = None
+        for index, current in enumerate(kept):
+            same_url = item.get("canonical") and item.get("canonical") == current.get("canonical")
+            same_address = (
+                int(item.get("beds") or 0) == int(current.get("beds") or 0)
+                and abs(int(item.get("rent") or 0) - int(current.get("rent") or 0)) <= 150
+                and address_match(item.get("address") or item.get("title") or "", current.get("address") or current.get("title") or "")
+            )
+            if same_url or same_address:
+                duplicate_index = index
+                break
+        if duplicate_index is None:
+            kept.append(item)
+            continue
+        current = kept[duplicate_index]
+        if priority.get(item.get("portal", ""), 9) < priority.get(current.get("portal", ""), 9):
+            kept[duplicate_index] = item
+    return kept
 
 
 def format_override_result(override: dict[str, Any]) -> str:
@@ -994,7 +1090,7 @@ def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | N
     lowered = text.lower()
     if any(term in lowered for term in ["room to rent", "house share", "flat share", "shared accommodation", "student accommodation", "double room", "single room", "large bright bedroom", "room in a"]):
         return False, "shared/student accommodation", None, None
-    if any(term in lowered for term in SCANNER_BLACKLISTED_KEYWORDS):
+    if scanner_blacklist_hit(text):
         return False, "contains concierge/blacklisted service", None, None
     if "let agreed" in lowered or "let-agreed" in lowered:
         return False, "let agreed", None, None
@@ -1499,7 +1595,8 @@ def scan_rental_listings_playwright(
                                         if len(samples) < 8:
                                             samples.append(compact_text(f"{link} | {title} | {snippet}", 500))
                                     continue
-                                fingerprint = listing_fingerprint(title, snippet, beds, rent, station)
+                                address = scanner_address_from_title(title, snippet)
+                                fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
                                 if fingerprint in seen_fingerprints_this_scan:
                                     skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
                                     continue
@@ -1508,7 +1605,6 @@ def scan_rental_listings_playwright(
                                     continue
                                 seen_fingerprints_this_scan.add(fingerprint)
 
-                                address = scanner_address_from_title(title, snippet)
                                 if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
                                     skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
                                     continue
@@ -1679,7 +1775,8 @@ def scan_rental_listings(
             if not ok:
                 skipped[reason] = skipped.get(reason, 0) + 1
                 continue
-            fingerprint = listing_fingerprint(title, snippet, beds, rent, station)
+            address = scanner_address_from_title(title, snippet)
+            fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
             if fingerprint in seen_fingerprints_this_scan:
                 skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
                 continue
@@ -1688,7 +1785,6 @@ def scan_rental_listings(
                 continue
             seen_fingerprints_this_scan.add(fingerprint)
 
-            address = scanner_address_from_title(title, snippet)
             if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
                 skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
                 continue
