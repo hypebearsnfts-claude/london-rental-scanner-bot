@@ -39,6 +39,7 @@ LOCAL_TZ = ZoneInfo("Europe/London")
 DAILY_SCAN_HOUR = 12
 SCANNER_LISTINGS_PER_MESSAGE = 6
 TELEGRAM_SEND_PAUSE_SECONDS = 1.05
+SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT = 120
 SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
@@ -542,12 +543,13 @@ def load_scanner_state() -> dict[str, Any]:
                 data.setdefault("subscribers", [])
                 data.setdefault("sent_urls", [])
                 data.setdefault("sent_fingerprints", [])
+                data.setdefault("sent_property_keys", [])
                 data.setdefault("last_scan_date", "")
                 data.setdefault("last_scan_failure_date", "")
                 return data
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         pass
-    return {"subscribers": [], "sent_urls": [], "sent_fingerprints": [], "last_scan_date": "", "last_scan_failure_date": ""}
+    return {"subscribers": [], "sent_urls": [], "sent_fingerprints": [], "sent_property_keys": [], "last_scan_date": "", "last_scan_failure_date": ""}
 
 
 def save_scanner_state(state: dict[str, Any]) -> None:
@@ -691,6 +693,17 @@ def legacy_listing_fingerprint(title: str, snippet: str, beds: int, rent: int, s
     tokens = [token for token in text.split() if len(token) > 2][:18]
     rent_bucket = round(rent / 25) * 25
     return f"{beds}|{rent_bucket}|{station.lower()}|{'-'.join(tokens)}"
+
+
+def property_identity_key(address: str, beds: int, rent: int) -> str:
+    raw_tokens = address_tokens(address)
+    tokens = [token for token in raw_tokens if token not in ADDRESS_GENERIC_TOKENS]
+    if len(tokens) < 2:
+        tokens = raw_tokens
+    if not tokens:
+        return ""
+    rent_bucket = round(rent / 100) * 100
+    return f"{beds}|{rent_bucket}|{'-'.join(tokens[:8])}"
 
 
 def cross_portal_dedup_key(item: dict[str, Any]) -> str:
@@ -1477,9 +1490,11 @@ def scan_rental_listings_playwright(
     state = load_scanner_state()
     sent_urls = set(state.get("sent_urls", []))
     sent_fingerprints = set(state.get("sent_fingerprints", []))
+    sent_property_keys = set(state.get("sent_property_keys", []))
     matches: list[dict[str, Any]] = []
     seen_this_scan: set[str] = set()
     seen_fingerprints_this_scan: set[str] = set()
+    seen_property_keys_this_scan: set[str] = set()
     skipped: dict[str, int] = {}
     skipped_samples: dict[str, list[str]] = {}
 
@@ -1605,14 +1620,58 @@ def scan_rental_listings_playwright(
                                 address = scanner_address_from_title(title, snippet)
                                 fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
                                 legacy_fingerprint = legacy_listing_fingerprint(title, snippet, beds, rent, station)
+                                property_key = property_identity_key(address, beds, rent)
                                 fingerprint_keys = {fingerprint, legacy_fingerprint}
-                                if fingerprint_keys & seen_fingerprints_this_scan:
+                                if (fingerprint_keys & seen_fingerprints_this_scan) or (property_key and property_key in seen_property_keys_this_scan):
                                     skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
                                     continue
-                                if fingerprint_keys & sent_fingerprints and not include_seen:
+                                if (fingerprint_keys & sent_fingerprints or (property_key and property_key in sent_property_keys)) and not include_seen:
+                                    skipped["already sent property"] = skipped.get("already sent property", 0) + 1
+                                    continue
+
+                                detail_checked = False
+                                detail_blocked = False
+                                if detail_pages_checked < SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT:
+                                    detail_pages_checked += 1
+                                    try:
+                                        detail_title, detail_text = playwright_page_text(context, link)
+                                        detail_checked = True
+                                        if not is_blocked_playwright_detail(detail_title, detail_text):
+                                            detail_title = detail_title or title
+                                            detail_snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
+                                            detail_ok, detail_reason, detail_beds, detail_rent = passes_scanner_filters(detail_title, detail_snippet)
+                                            if not detail_ok:
+                                                skipped[detail_reason] = skipped.get(detail_reason, 0) + 1
+                                                continue
+                                            title = detail_title
+                                            snippet = detail_snippet
+                                            beds = detail_beds or beds
+                                            rent = detail_rent or rent
+                                            address = scanner_address_from_title(title, snippet)
+                                            fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
+                                            legacy_fingerprint = legacy_listing_fingerprint(title, snippet, beds, rent, station)
+                                            property_key = property_identity_key(address, beds, rent)
+                                            fingerprint_keys = {fingerprint, legacy_fingerprint}
+                                            live_status = "verified"
+                                        else:
+                                            detail_blocked = True
+                                    except Exception as error:
+                                        detail_blocked = True
+                                        samples = skipped_samples.setdefault("detail page blacklist check blocked", [])
+                                        if len(samples) < 8:
+                                            samples.append(f"{link} ({type(error).__name__})")
+                                else:
+                                    skipped["detail blacklist check limit reached"] = skipped.get("detail blacklist check limit reached", 0) + 1
+
+                                if (fingerprint_keys & seen_fingerprints_this_scan) or (property_key and property_key in seen_property_keys_this_scan):
+                                    skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
+                                    continue
+                                if (fingerprint_keys & sent_fingerprints or (property_key and property_key in sent_property_keys)) and not include_seen:
                                     skipped["already sent property"] = skipped.get("already sent property", 0) + 1
                                     continue
                                 seen_fingerprints_this_scan.update(fingerprint_keys)
+                                if property_key:
+                                    seen_property_keys_this_scan.add(property_key)
 
                                 if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
                                     skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
@@ -1647,6 +1706,9 @@ def scan_rental_listings_playwright(
                                         "live_status": live_status,
                                         "fingerprint": fingerprint,
                                         "legacy_fingerprint": legacy_fingerprint,
+                                        "property_key": property_key,
+                                        "detail_checked": detail_checked,
+                                        "detail_blocked": detail_blocked,
                                     }
                                 )
                         finally:
@@ -1679,9 +1741,11 @@ def scan_rental_listings(
     state = load_scanner_state()
     sent_urls = set(state.get("sent_urls", []))
     sent_fingerprints = set(state.get("sent_fingerprints", []))
+    sent_property_keys = set(state.get("sent_property_keys", []))
     matches: list[dict[str, Any]] = []
     seen_this_scan: set[str] = set()
     seen_fingerprints_this_scan: set[str] = set()
+    seen_property_keys_this_scan: set[str] = set()
     skipped: dict[str, int] = {}
     skipped_samples: dict[str, list[str]] = {}
     consecutive_search_errors = 0
@@ -1788,14 +1852,17 @@ def scan_rental_listings(
             address = scanner_address_from_title(title, snippet)
             fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
             legacy_fingerprint = legacy_listing_fingerprint(title, snippet, beds, rent, station)
+            property_key = property_identity_key(address, beds, rent)
             fingerprint_keys = {fingerprint, legacy_fingerprint}
-            if fingerprint_keys & seen_fingerprints_this_scan:
+            if (fingerprint_keys & seen_fingerprints_this_scan) or (property_key and property_key in seen_property_keys_this_scan):
                 skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
                 continue
-            if fingerprint_keys & sent_fingerprints and not include_seen:
+            if (fingerprint_keys & sent_fingerprints or (property_key and property_key in sent_property_keys)) and not include_seen:
                 skipped["already sent property"] = skipped.get("already sent property", 0) + 1
                 continue
             seen_fingerprints_this_scan.update(fingerprint_keys)
+            if property_key:
+                seen_property_keys_this_scan.add(property_key)
 
             if USE_GOOGLE_MAPS_WALKING_FILTER and not google_maps_key:
                 skipped["missing maps key"] = skipped.get("missing maps key", 0) + 1
@@ -1830,6 +1897,7 @@ def scan_rental_listings(
                     "live_status": live_status,
                     "fingerprint": fingerprint,
                     "legacy_fingerprint": legacy_fingerprint,
+                    "property_key": property_key,
                 }
             )
 
@@ -2870,6 +2938,7 @@ class TelegramBot:
         state = load_scanner_state()
         sent_urls = set(state.get("sent_urls", []))
         sent_fingerprints = set(state.get("sent_fingerprints", []))
+        sent_property_keys = set(state.get("sent_property_keys", []))
         for start in range(0, len(matches), SCANNER_LISTINGS_PER_MESSAGE):
             batch = matches[start:start + SCANNER_LISTINGS_PER_MESSAGE]
             self.send_message(chat_id, format_scanner_listing_batch(batch))
@@ -2879,9 +2948,12 @@ class TelegramBot:
                     sent_fingerprints.add(item["fingerprint"])
                 if item.get("legacy_fingerprint"):
                     sent_fingerprints.add(item["legacy_fingerprint"])
+                if item.get("property_key"):
+                    sent_property_keys.add(item["property_key"])
             time.sleep(TELEGRAM_SEND_PAUSE_SECONDS)
         state["sent_urls"] = sorted(sent_urls)
         state["sent_fingerprints"] = sorted(sent_fingerprints)
+        state["sent_property_keys"] = sorted(sent_property_keys)
         save_scanner_state(state)
         return meta
 
