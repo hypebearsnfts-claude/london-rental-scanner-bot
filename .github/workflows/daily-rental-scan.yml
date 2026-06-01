@@ -12,10 +12,10 @@ on:
           - test
           - full
   schedule:
-    # GitHub schedules use UTC. Running at both 11:00 and 12:00 UTC lets the
-    # Python script fire once at 12:00 London time across daylight saving.
-    - cron: "0 11 * * *"
-    - cron: "0 12 * * *"
+    # GitHub schedules use UTC and can be delayed or occasionally skipped.
+    # Run hourly through the afternoon; the Python script records last_scan_date
+    # and sends at most once per London day after 12:00.
+    - cron: "0 11-18 * * *"
 
 permissions:
   contents: write
