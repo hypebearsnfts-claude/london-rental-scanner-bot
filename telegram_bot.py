@@ -44,6 +44,9 @@ SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT = 120
 SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
+TWO_BED_MAX_RENT = 5500
+THREE_BED_MAX_RENT = 4600
+LARGE_BED_MAX_RENT = 14000
 PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION = 50
 PLAYWRIGHT_NAV_TIMEOUT_MS = 18_000
 PLAYWRIGHT_SEARCH_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MIN_MS", "2500"))
@@ -1143,9 +1146,11 @@ def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | N
     if rent is None:
         return False, "rent not visible", beds, None
 
-    if 2 <= beds <= 3 and rent < 4600:
+    if beds == 2 and rent <= TWO_BED_MAX_RENT:
         return True, "", beds, rent
-    if 4 <= beds <= 8 and rent <= 14000:
+    if beds == 3 and rent < THREE_BED_MAX_RENT:
+        return True, "", beds, rent
+    if 4 <= beds <= 8 and rent <= LARGE_BED_MAX_RENT:
         return True, "", beds, rent
     return False, "outside rent/bed filters", beds, rent
 
@@ -3136,7 +3141,7 @@ class TelegramBot:
                     "Send /scan to look for matching rental listings now.\n"
                     "Send /subscribe to receive daily alerts.\n"
                     "Send /unsubscribe to stop daily alerts.\n\n"
-                    "Filters: 2-3 beds under £4,600 pcm; 4-8 beds up to £14,000 pcm; near your selected central/west London stations; no concierge; no duplicates."
+                    "Filters: 2 beds up to £5,500 pcm; 3 beds under £4,600 pcm; 4-8 beds up to £14,000 pcm; near your selected central/west London stations; no concierge; no duplicates."
                 ),
             )
             return
