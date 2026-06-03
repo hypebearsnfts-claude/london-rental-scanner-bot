@@ -13,6 +13,7 @@ from html.parser import HTMLParser
 import json
 import math
 import os
+import random
 import re
 import sys
 import time
@@ -45,6 +46,12 @@ SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
 PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION = 50
 PLAYWRIGHT_NAV_TIMEOUT_MS = 18_000
+PLAYWRIGHT_SEARCH_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MIN_MS", "2500"))
+PLAYWRIGHT_SEARCH_PAUSE_MAX_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MAX_MS", "5500"))
+PLAYWRIGHT_DETAIL_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_PAUSE_MIN_MS", "1200"))
+PLAYWRIGHT_DETAIL_PAUSE_MAX_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_PAUSE_MAX_MS", "3200"))
+PLAYWRIGHT_BLOCK_RETRY_PAUSE_MS = int(os.environ.get("PLAYWRIGHT_BLOCK_RETRY_PAUSE_MS", "15000"))
+PLAYWRIGHT_SEARCH_RETRIES = int(os.environ.get("PLAYWRIGHT_SEARCH_RETRIES", "1"))
 REQUIRE_LIVE_DETAIL_VERIFICATION = True
 MAX_WALKING_MINUTES = 8
 USE_GOOGLE_MAPS_WALKING_FILTER = False
@@ -1263,13 +1270,30 @@ def playwright_should_verify_detail_pages() -> bool:
     return os.environ.get(PLAYWRIGHT_VERIFY_DETAIL_PAGES_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def env_flag(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
+def random_pause_ms(min_ms: int, max_ms: int) -> int:
+    if max_ms <= min_ms:
+        return max(0, min_ms)
+    return random.randint(max(0, min_ms), max_ms)
+
+
+def playwright_polite_pause(page: Any, min_ms: int, max_ms: int) -> None:
+    page.wait_for_timeout(random_pause_ms(min_ms, max_ms))
+
+
 def playwright_new_context(browser: Any) -> Any:
-    return browser.new_context(
+    context = browser.new_context(
         locale="en-GB",
         timezone_id="Europe/London",
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
         ),
         viewport={"width": 1280, "height": 900},
         extra_http_headers={
@@ -1277,6 +1301,21 @@ def playwright_new_context(browser: Any) -> Any:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         },
     )
+    context.add_init_script(
+        """
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-GB', 'en'] });
+        Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
+        """
+    )
+    if env_flag("PLAYWRIGHT_BLOCK_HEAVY_RESOURCES", True):
+        context.route(
+            "**/*",
+            lambda route: route.abort()
+            if route.request.resource_type in {"image", "media", "font"}
+            else route.continue_(),
+        )
+    return context
 
 
 def playwright_collect_links(page: Any) -> list[dict[str, str]]:
@@ -1407,7 +1446,29 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
 
 def is_blocked_playwright_detail(title: str, text: str) -> bool:
     lowered = f"{title} {text}".lower()
-    return any(term in lowered for term in ["just a moment", "checking your browser", "enable javascript and cookies", "access denied"])
+    return any(
+        term in lowered
+        for term in [
+            "just a moment",
+            "checking your browser",
+            "enable javascript and cookies",
+            "access denied",
+            "human verification",
+            "complete the security check",
+            "performing security verification",
+            "protect against malicious bots",
+            "captcha",
+        ]
+    )
+
+
+def is_blocked_playwright_page(page: Any) -> bool:
+    try:
+        title = page.title() or ""
+        text = page.locator("body").inner_text(timeout=2500)
+        return is_blocked_playwright_detail(title, text)
+    except Exception:
+        return False
 
 
 def playwright_search_diagnostic(page: Any, url: str) -> str:
@@ -1462,6 +1523,7 @@ def playwright_prepare_search_results(page: Any, domain: str) -> None:
         page.evaluate("window.scrollTo(0, 500)")
         page.wait_for_timeout(500)
         page.evaluate("window.scrollTo(0, 1000)")
+        page.wait_for_timeout(350)
     except Exception:
         pass
 
@@ -1469,8 +1531,14 @@ def playwright_prepare_search_results(page: Any, domain: str) -> None:
 def playwright_page_text(context: Any, url: str) -> tuple[str, str]:
     detail_page = context.new_page()
     try:
+        playwright_polite_pause(detail_page, PLAYWRIGHT_DETAIL_PAUSE_MIN_MS, PLAYWRIGHT_DETAIL_PAUSE_MAX_MS)
         detail_page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
+        try:
+            detail_page.wait_for_load_state("networkidle", timeout=3500)
+        except Exception:
+            pass
         playwright_accept_cookies(detail_page)
+        playwright_polite_pause(detail_page, 400, 1200)
         title = detail_page.title() or ""
         text = detail_page.locator("body").inner_text(timeout=5000)
         return title, compact_text(text, 9000)
@@ -1520,47 +1588,65 @@ def scan_rental_listings_playwright(
                 for domain in scan_domains:
                     seen_page_links: set[str] = set()
                     page_index = 0
-                    while max_pages is None or page_index < max_pages:
-                        url = playwright_search_url(domain, station, page_index)
-                        if not url:
-                            skipped[f"no station URL for {domain}"] = skipped.get(f"no station URL for {domain}", 0) + 1
-                            break
-                        pages_checked += 1
-                        context = playwright_new_context(browser)
-                        page = context.new_page()
-                        try:
-                            page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
-                            page.wait_for_timeout(1500)
-                            playwright_prepare_search_results(page, domain)
-                            page_results = playwright_collect_portal_results(page, domain)
-                        except Exception as error:
-                            key = f"playwright search error: {station} {domain}: {type(error).__name__}"
-                            skipped[key] = skipped.get(key, 0) + 1
-                            context.close()
-                            break
+                    context = playwright_new_context(browser)
+                    try:
+                        while max_pages is None or page_index < max_pages:
+                            url = playwright_search_url(domain, station, page_index)
+                            if not url:
+                                skipped[f"no station URL for {domain}"] = skipped.get(f"no station URL for {domain}", 0) + 1
+                                break
+                            pages_checked += 1
+                            page = context.new_page()
+                            try:
+                                page_results = []
+                                blocked_search_page = False
+                                for attempt in range(PLAYWRIGHT_SEARCH_RETRIES + 1):
+                                    page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
+                                    try:
+                                        page.wait_for_load_state("networkidle", timeout=4000)
+                                    except Exception:
+                                        pass
+                                    playwright_polite_pause(page, PLAYWRIGHT_SEARCH_PAUSE_MIN_MS, PLAYWRIGHT_SEARCH_PAUSE_MAX_MS)
+                                    playwright_prepare_search_results(page, domain)
+                                    blocked_search_page = is_blocked_playwright_page(page)
+                                    if not blocked_search_page:
+                                        page_results = playwright_collect_portal_results(page, domain)
+                                        break
+                                    if attempt < PLAYWRIGHT_SEARCH_RETRIES:
+                                        skipped["portal security retry"] = skipped.get("portal security retry", 0) + 1
+                                        page.wait_for_timeout(PLAYWRIGHT_BLOCK_RETRY_PAUSE_MS)
+                                        page.reload(wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
+                                if blocked_search_page:
+                                    skipped["portal security blocked"] = skipped.get("portal security blocked", 0) + 1
+                                    samples = skipped_samples.setdefault("portal security blocked", [])
+                                    if len(samples) < 8:
+                                        samples.append(playwright_search_diagnostic(page, url))
+                                    break
+                            except Exception as error:
+                                key = f"playwright search error: {station} {domain}: {type(error).__name__}"
+                                skipped[key] = skipped.get(key, 0) + 1
+                                break
 
-                        new_detail_links = []
-                        for result in page_results:
-                            link = canonical_listing_url(result.get("link", ""))
-                            if not is_detail_listing_url(link):
-                                continue
-                            if link in seen_page_links:
-                                continue
-                            seen_page_links.add(link)
-                            result["link"] = link
-                            new_detail_links.append(result)
+                            new_detail_links = []
+                            for result in page_results:
+                                link = canonical_listing_url(result.get("link", ""))
+                                if not is_detail_listing_url(link):
+                                    continue
+                                if link in seen_page_links:
+                                    continue
+                                seen_page_links.add(link)
+                                result["link"] = link
+                                new_detail_links.append(result)
 
-                        if not new_detail_links:
-                            reason = "end of search results" if page_index > 0 else "no detail links on search page"
-                            skipped[reason] = skipped.get(reason, 0) + 1
-                            if page_index == 0:
-                                samples = skipped_samples.setdefault("no detail links on search page", [])
-                                if len(samples) < 8:
-                                    samples.append(playwright_search_diagnostic(page, url))
-                            context.close()
-                            break
+                            if not new_detail_links:
+                                reason = "end of search results" if page_index > 0 else "no detail links on search page"
+                                skipped[reason] = skipped.get(reason, 0) + 1
+                                if page_index == 0:
+                                    samples = skipped_samples.setdefault("no detail links on search page", [])
+                                    if len(samples) < 8:
+                                        samples.append(playwright_search_diagnostic(page, url))
+                                break
 
-                        try:
                             for result in new_detail_links:
                                 link = result["link"]
                                 canonical = canonical_listing_url(link)
@@ -1711,9 +1797,10 @@ def scan_rental_listings_playwright(
                                         "detail_blocked": detail_blocked,
                                     }
                                 )
-                        finally:
-                            context.close()
-                        page_index += 1
+                            page_index += 1
+                            page.close()
+                    finally:
+                        context.close()
         finally:
             browser.close()
 
