@@ -36,6 +36,7 @@ PLAYWRIGHT_VERIFY_DETAIL_PAGES_ENV = "PLAYWRIGHT_VERIFY_DETAIL_PAGES"
 OVERRIDES_FILE = "listing_overrides.json"
 LOG_FILE = "bot.log"
 SCANNER_STATE_FILE = "scanner_state.json"
+AIRDNA_RATES_FILE = "airdna_rates.json"
 LOCAL_TZ = ZoneInfo("Europe/London")
 DAILY_SCAN_HOUR = 12
 SCANNER_LISTINGS_PER_MESSAGE = 6
@@ -45,8 +46,10 @@ SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
 TWO_BED_MAX_RENT = 5500
-THREE_BED_MAX_RENT = 4600
+THREE_BED_MAX_RENT = 13000
 LARGE_BED_MAX_RENT = 14000
+AIRDNA_STR_MAX_ABOVE_ADR = int(os.environ.get("AIRDNA_STR_MAX_ABOVE_ADR", "50"))
+AIRDNA_FMV_CHECK_ENABLED = os.environ.get("AIRDNA_FMV_CHECK_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
 PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION = 50
 PLAYWRIGHT_NAV_TIMEOUT_MS = 18_000
 PLAYWRIGHT_SEARCH_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MIN_MS", "2500"))
@@ -68,6 +71,7 @@ MONEY_RE = re.compile(
 SQFT_RE = re.compile(r"\b([0-9]{3,4})\s*(?:sq\.?\s*ft|sqft|square feet)\b", re.IGNORECASE)
 SQFT_REVERSED_RE = re.compile(r"\b(?:sq\.?\s*ft|sqft|square feet)\s*:?\s*([0-9]{3,4})\b", re.IGNORECASE)
 BED_RE = re.compile(r"\b([1-8])\s*(?:bed|beds|bedroom|bedrooms|br)\b", re.IGNORECASE)
+_AIRDNA_RATES_CACHE: dict[str, Any] | None = None
 
 WATCH_STATIONS = [
     "Kensington Olympia",
@@ -304,6 +308,75 @@ def pick(seed: int, values: list[Any], offset: int = 0) -> Any:
 
 def money(value: float) -> str:
     return f"£{value:,.0f}"
+
+
+def load_airdna_rates() -> dict[str, Any]:
+    global _AIRDNA_RATES_CACHE
+    if _AIRDNA_RATES_CACHE is not None:
+        return _AIRDNA_RATES_CACHE
+    path = os.path.join(os.path.dirname(__file__), AIRDNA_RATES_FILE)
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+            _AIRDNA_RATES_CACHE = data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        _AIRDNA_RATES_CACHE = {}
+    return _AIRDNA_RATES_CACHE
+
+
+def airdna_station_candidates(station: str) -> list[str]:
+    candidates = [station]
+    candidates.extend(STATION_ALIASES.get(station, []))
+    if station == "Regent Park":
+        candidates.append("Regent's Park")
+    normalized_seen: set[str] = set()
+    unique: list[str] = []
+    for candidate in candidates:
+        key = re.sub(r"[^a-z0-9]+", "", candidate.lower())
+        if key and key not in normalized_seen:
+            normalized_seen.add(key)
+            unique.append(candidate)
+    return unique
+
+
+def get_airdna_avg(station: str, beds: int) -> int | None:
+    rates = load_airdna_rates()
+    by_station = rates.get("by_station", {})
+    by_bedrooms = rates.get("by_bedrooms", {})
+    beds_key = str(min(max(int(beds), 1), 7))
+
+    if isinstance(by_station, dict):
+        for candidate in airdna_station_candidates(station):
+            station_rates = by_station.get(candidate, {})
+            if isinstance(station_rates, dict) and station_rates.get(beds_key):
+                return int(station_rates[beds_key])
+
+    if isinstance(by_bedrooms, dict) and by_bedrooms.get(beds_key):
+        return int(by_bedrooms[beds_key])
+    return None
+
+
+def airdna_fmv_verdict(station: str, beds: int, rent: int) -> dict[str, Any]:
+    """
+    Copy of the reference bot's AirDNA STR viability gate:
+    required_nightly = asking_pcm * 1.5 / 21
+    pass if required_nightly <= AirDNA ADR + AIRDNA_STR_MAX_ABOVE_ADR.
+    """
+    if not AIRDNA_FMV_CHECK_ENABLED:
+        return {"pass": True, "enabled": False}
+    airdna_avg = get_airdna_avg(station, beds)
+    if not airdna_avg:
+        return {"pass": True, "enabled": True, "airdna_avg": None, "reason": "no AirDNA data"}
+    required_nightly = (rent * 1.5) / 21
+    margin = required_nightly - airdna_avg
+    return {
+        "pass": margin <= AIRDNA_STR_MAX_ABOVE_ADR,
+        "enabled": True,
+        "airdna_avg": airdna_avg,
+        "required_nightly": required_nightly,
+        "margin": margin,
+        "tolerance": AIRDNA_STR_MAX_ABOVE_ADR,
+    }
 
 
 def log_event(message: str) -> None:
@@ -1148,7 +1221,7 @@ def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | N
 
     if beds == 2 and rent <= TWO_BED_MAX_RENT:
         return True, "", beds, rent
-    if beds == 3 and rent < THREE_BED_MAX_RENT:
+    if beds == 3 and rent <= THREE_BED_MAX_RENT:
         return True, "", beds, rent
     if 4 <= beds <= 8 and rent <= LARGE_BED_MAX_RENT:
         return True, "", beds, rent
@@ -1781,6 +1854,11 @@ def scan_rental_listings_playwright(
                                 else:
                                     closest = {"station": station, "minutes": None}
 
+                                airdna = airdna_fmv_verdict(closest["station"], beds, rent)
+                                if not airdna.get("pass"):
+                                    skipped["failed AirDNA FMV check"] = skipped.get("failed AirDNA FMV check", 0) + 1
+                                    continue
+
                                 matches.append(
                                     {
                                         "title": clean_listing_title(title),
@@ -1800,6 +1878,7 @@ def scan_rental_listings_playwright(
                                         "property_key": property_key,
                                         "detail_checked": detail_checked,
                                         "detail_blocked": detail_blocked,
+                                        "airdna": airdna,
                                     }
                                 )
                             page_index += 1
@@ -1973,6 +2052,11 @@ def scan_rental_listings(
             else:
                 closest = {"station": station, "minutes": None}
 
+            airdna = airdna_fmv_verdict(closest["station"], beds, rent)
+            if not airdna.get("pass"):
+                skipped["failed AirDNA FMV check"] = skipped.get("failed AirDNA FMV check", 0) + 1
+                continue
+
             matches.append(
                 {
                     "title": clean_listing_title(title),
@@ -1990,6 +2074,7 @@ def scan_rental_listings(
                     "fingerprint": fingerprint,
                     "legacy_fingerprint": legacy_fingerprint,
                     "property_key": property_key,
+                    "airdna": airdna,
                 }
             )
 
@@ -2009,15 +2094,23 @@ def format_scanner_listing(item: dict[str, Any]) -> str:
         if item.get("walking_minutes") is not None
         else f"station match: {html.escape(item['closest_station'])}"
     )
+    airdna = item.get("airdna") or {}
+    airdna_line = ""
+    if airdna.get("enabled") and airdna.get("airdna_avg"):
+        airdna_line = (
+            f"AirDNA FMV: needs {money(airdna.get('required_nightly', 0))}/night; "
+            f"avg {money(airdna['airdna_avg'])}/night"
+        )
     link = html.escape(item["link"])
-    return "\n".join(
-        [
-            f"<b>{html.escape(item['title'])}</b>",
-            f"{item['beds']} bed | {money(item['rent'])} pcm | {html.escape(item['portal'])}",
-            station_line,
-            link,
-        ]
-    )
+    lines = [
+        f"<b>{html.escape(item['title'])}</b>",
+        f"{item['beds']} bed | {money(item['rent'])} pcm | {html.escape(item['portal'])}",
+        station_line,
+    ]
+    if airdna_line:
+        lines.append(airdna_line)
+    lines.append(link)
+    return "\n".join(lines)
 
 
 def format_scanner_listing_batch(items: list[dict[str, Any]]) -> str:
@@ -3141,7 +3234,7 @@ class TelegramBot:
                     "Send /scan to look for matching rental listings now.\n"
                     "Send /subscribe to receive daily alerts.\n"
                     "Send /unsubscribe to stop daily alerts.\n\n"
-                    "Filters: 2 beds up to £5,500 pcm; 3 beds under £4,600 pcm; 4-8 beds up to £14,000 pcm; near your selected central/west London stations; no concierge; no duplicates."
+                    "Filters: 2 beds up to £5,500 pcm; 3 beds up to £13,000 pcm; 4-8 beds up to £14,000 pcm; must pass AirDNA FMV check; near your selected central/west London stations; no concierge; no duplicates."
                 ),
             )
             return
