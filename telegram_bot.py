@@ -147,30 +147,38 @@ SCANNER_BLACKLISTED_PATTERNS = [
 ]
 
 RIGHTMOVE_LOCATION_IDS = {
-    # Copied from the reference scraper's Rightmove AREAS map where available.
-    "Marble Arch": "STATION^6032",
-    "Bond Street": "STATION^1166",
+    # Rightmove locationIdentifier values from the reference scraper map.
+    "Angel": "STATION^339",
     "Baker Street": "STATION^488",
-    "Regent Park": "STATION^7658",
-    "Oxford Circus": "STATION^6953",
+    "Bond Street": "STATION^1166",
+    "Chancery Lane": "STATION^1920",
+    "Charing Cross": "STATION^1936",
     "Covent Garden": "REGION^87501",
+    "Farringdon": "STATION^3552",
     "Gloucester Road": "STATION^3809",
+    "Goodge Street": "STATION^3863",
+    "Holborn": "STATION^4668",
+    "Kensington Olympia": "STATION^5011",
+    "King's Cross St Pancras": "STATION^5165",
     "Lancaster Gate": "STATION^5354",
+    "Marble Arch": "STATION^6032",
+    "Marylebone": "STATION^6095",
+    "Old Street": "STATION^6855",
+    "Oxford Circus": "STATION^6953",
+    "Piccadilly Circus": "REGION^87529",
+    "Regent Park": "STATION^7658",
+    "Regent's Park": "STATION^7658",
+    "Russell Square": "STATION^7877",
+    "Soho": "REGION^87529",
     "Victoria": "STATION^9491",
 }
 
 RIGHTMOVE_STATION_ID_GAPS = {
-    # The reference repo still contains these older IDs, but live Rightmove
-    # now returns a page-not-found for them. Leave them out until reconfirmed.
-    "Kensington Olympia",
-    "Holborn",
-    "Charing Cross",
-    # Not present in the reference repo's Rightmove map.
+    # Not present in the current Rightmove reference map supplied by the user.
     "Bayswater",
     "South Kensington",
     "Tottenham Court Road",
     "Leicester Square",
-    "Piccadilly Circus",
 }
 
 STATION_SLUGS = {
