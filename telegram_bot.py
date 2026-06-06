@@ -148,15 +148,29 @@ SCANNER_BLACKLISTED_PATTERNS = [
 
 RIGHTMOVE_LOCATION_IDS = {
     # Copied from the reference scraper's Rightmove AREAS map where available.
-    "Kensington Olympia": "STATION^5011",
     "Marble Arch": "STATION^6032",
     "Bond Street": "STATION^1166",
     "Baker Street": "STATION^488",
     "Regent Park": "STATION^7658",
     "Oxford Circus": "STATION^6953",
     "Covent Garden": "REGION^87501",
-    "Holborn": "STATION^4668",
-    "Charing Cross": "STATION^1936",
+    "Gloucester Road": "STATION^3809",
+    "Lancaster Gate": "STATION^5354",
+    "Victoria": "STATION^9491",
+}
+
+RIGHTMOVE_STATION_ID_GAPS = {
+    # The reference repo still contains these older IDs, but live Rightmove
+    # now returns a page-not-found for them. Leave them out until reconfirmed.
+    "Kensington Olympia",
+    "Holborn",
+    "Charing Cross",
+    # Not present in the reference repo's Rightmove map.
+    "Bayswater",
+    "South Kensington",
+    "Tottenham Court Road",
+    "Leicester Square",
+    "Piccadilly Circus",
 }
 
 STATION_SLUGS = {
@@ -1597,6 +1611,19 @@ def playwright_prepare_search_results(page: Any, domain: str) -> None:
             page.evaluate("const b = document.getElementById('ccc-recommended-settings'); if (b) b.click();")
         except Exception:
             pass
+    if domain == "openrent.co.uk":
+        try:
+            previous = -1
+            for _ in range(10):
+                current = page.evaluate("document.querySelectorAll('a.pli, div.property-result').length")
+                if current == previous and current > 0:
+                    break
+                previous = current
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(900)
+            return
+        except Exception:
+            pass
     try:
         page.evaluate("window.scrollTo(0, 500)")
         page.wait_for_timeout(500)
@@ -1646,6 +1673,10 @@ def scan_rental_listings_playwright(
 
     scan_stations = stations or WATCH_STATIONS
     scan_domains = domains or list(WATCH_PORTALS.keys())
+    portal_stats: dict[str, dict[str, int]] = {
+        domain: {"pages": 0, "raw_results": 0, "detail_links": 0, "sent": 0}
+        for domain in scan_domains
+    }
     max_pages = max_pages_per_portal_station
     verify_detail_pages = playwright_should_verify_detail_pages()
     pages_checked = 0
@@ -1666,15 +1697,23 @@ def scan_rental_listings_playwright(
                 for domain in scan_domains:
                     seen_page_links: set[str] = set()
                     page_index = 0
-                    context = playwright_new_context(browser)
-                    try:
-                        while max_pages is None or page_index < max_pages:
-                            url = playwright_search_url(domain, station, page_index)
-                            if not url:
-                                skipped[f"no station URL for {domain}"] = skipped.get(f"no station URL for {domain}", 0) + 1
-                                break
-                            pages_checked += 1
-                            page = context.new_page()
+                    while max_pages is None or page_index < max_pages:
+                        url = playwright_search_url(domain, station, page_index)
+                        if not url:
+                            reason = f"no station URL for {domain}"
+                            if domain == "rightmove.co.uk" and station in RIGHTMOVE_STATION_ID_GAPS:
+                                reason = "no confirmed Rightmove station ID"
+                            skipped[reason] = skipped.get(reason, 0) + 1
+                            samples = skipped_samples.setdefault(reason, [])
+                            if len(samples) < 12:
+                                samples.append(station)
+                            break
+                        pages_checked += 1
+                        portal_stats.setdefault(domain, {"pages": 0, "raw_results": 0, "detail_links": 0, "sent": 0})
+                        portal_stats[domain]["pages"] += 1
+                        context = playwright_new_context(browser)
+                        page = context.new_page()
+                        try:
                             try:
                                 page_results = []
                                 blocked_search_page = False
@@ -1689,6 +1728,7 @@ def scan_rental_listings_playwright(
                                     blocked_search_page = is_blocked_playwright_page(page)
                                     if not blocked_search_page:
                                         page_results = playwright_collect_portal_results(page, domain)
+                                        portal_stats[domain]["raw_results"] += len(page_results)
                                         break
                                     if attempt < PLAYWRIGHT_SEARCH_RETRIES:
                                         skipped["portal security retry"] = skipped.get("portal security retry", 0) + 1
@@ -1724,6 +1764,7 @@ def scan_rental_listings_playwright(
                                     if len(samples) < 8:
                                         samples.append(playwright_search_diagnostic(page, url))
                                 break
+                            portal_stats[domain]["detail_links"] += len(new_detail_links)
 
                             for result in new_detail_links:
                                 link = result["link"]
@@ -1881,10 +1922,11 @@ def scan_rental_listings_playwright(
                                         "airdna": airdna,
                                     }
                                 )
+                                portal_stats[domain]["sent"] += 1
                             page_index += 1
                             page.close()
-                    finally:
-                        context.close()
+                        finally:
+                            context.close()
         finally:
             browser.close()
 
@@ -1893,6 +1935,8 @@ def scan_rental_listings_playwright(
     return matches, {
         "skipped": skipped,
         "skipped_samples": skipped_samples,
+        "portal_stats": portal_stats,
+        "rightmove_station_id_gaps": sorted(station for station in scan_stations if station in RIGHTMOVE_STATION_ID_GAPS),
         "queried_stations": len(scan_stations),
         "queries": pages_checked,
         "detail_pages_checked": detail_pages_checked,
