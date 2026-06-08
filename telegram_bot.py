@@ -1480,7 +1480,12 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 if (!link) return null;
                 const address = (card.querySelector('address, [class*="Address"], [class*="address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
                 const title = address || card.querySelector('h2, [class*="Title"], [class*="title"]')?.innerText || text.slice(0, 100);
-                return {title, link: link.href, snippet: text, source: location.hostname, date: ''};
+                const agent = (
+                  card.querySelector('[data-test*="agent"], [data-testid*="agent"], [class*="Agent"], [class*="Branch"]')?.innerText ||
+                  card.querySelector('img[alt*="logo" i], img[alt*="estate" i], img[alt*="letting" i]')?.getAttribute('alt') ||
+                  ''
+                ).replace(/\\s+/g, ' ').replace(/\\s*logo\\s*$/i, '').trim();
+                return {title, link: link.href, snippet: text, source: location.hostname, date: '', listed_by: agent};
               }).filter(Boolean)
             """
         )
@@ -1496,7 +1501,12 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                 const address = (card.querySelector('[data-testid*="address"], [class*="address"], [class*="Address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
                 const title = address || card.querySelector('[data-testid*="title"], h2, [class*="title"], [class*="Title"]')?.innerText || text.slice(0, 100);
-                return {title, link: href, snippet: text, source: location.hostname, date: ''};
+                const agent = (
+                  card.querySelector('[data-testid="listing-agent-name"], [data-testid*="agent"], [class*="AgentName"], [class*="agent-name"], [class*="BranchName"]')?.innerText ||
+                  card.querySelector('img[alt*="logo" i], img[alt*="estate" i], img[alt*="letting" i]')?.getAttribute('alt') ||
+                  ''
+                ).replace(/\\s+/g, ' ').replace(/\\s*logo\\s*$/i, '').trim();
+                return {title, link: href, snippet: text, source: location.hostname, date: '', listed_by: agent};
               }).filter(Boolean)
             """
         )
@@ -1512,7 +1522,12 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 const link = Array.from(card.querySelectorAll('a[href*="/details/"]')).find(a => a.href);
                 if (!link) return null;
                 const address = (card.querySelector('address')?.innerText || '').replace(/\\s+/g, ' ').trim();
-                return {title: address || text.slice(0, 100), link: link.href, snippet: text, source: location.hostname, date: ''};
+                const agent = (
+                  card.querySelector('[data-testid*="agent"], [data-testid*="branch"], [class*="Agent"], [class*="Branch"], [class*="agent"], [class*="branch"]')?.innerText ||
+                  card.querySelector('img[alt*="logo" i], img[alt*="estate" i], img[alt*="letting" i]')?.getAttribute('alt') ||
+                  ''
+                ).replace(/\\s+/g, ' ').replace(/\\s*logo\\s*$/i, '').trim();
+                return {title: address || text.slice(0, 100), link: link.href, snippet: text, source: location.hostname, date: '', listed_by: agent};
               }).filter(Boolean)
             """
         )
@@ -1538,7 +1553,7 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                   const title = (titleMatch ? titleMatch[0] : text.split(' Last updated ')[0] || text).trim();
                   if (!href && id) href = `${location.origin}/property-to-rent/london/${slugify(title)}/${id}`;
                   if (!href) return null;
-                  return {title, link: href, snippet: text, source: location.hostname, date: ''};
+                  return {title, link: href, snippet: text, source: location.hostname, date: '', listed_by: 'OpenRent'};
                 }).filter(Boolean);
             }
             """
@@ -1917,6 +1932,7 @@ def scan_rental_listings_playwright(
                                         "link": link,
                                         "canonical": canonical,
                                         "portal": portal_from_link(link),
+                                        "listed_by": result.get("listed_by") or portal_from_link(link),
                                         "station": station,
                                         "closest_station": closest["station"],
                                         "walking_minutes": closest["minutes"],
@@ -2172,29 +2188,12 @@ def format_scanner_listing_batch(items: list[dict[str, Any]]) -> str:
 
 
 def scanner_export_row(item: dict[str, Any], meta: dict[str, Any], chat_id: int) -> dict[str, Any]:
-    airdna = item.get("airdna") or {}
-    now = datetime.now(LOCAL_TZ)
     return {
-        "scan_date": now.date().isoformat(),
-        "scan_time_london": now.strftime("%H:%M:%S"),
-        "chat_id": chat_id,
-        "portal": item.get("portal", ""),
-        "title": item.get("title", ""),
-        "address": item.get("address", ""),
-        "beds": item.get("beds", ""),
-        "rent_pcm": item.get("rent", ""),
-        "station_search": item.get("station", ""),
-        "closest_station": item.get("closest_station", ""),
-        "walking_minutes": item.get("walking_minutes", ""),
-        "live_status": item.get("live_status", ""),
-        "airdna_required_nightly": airdna.get("required_nightly", ""),
-        "airdna_avg_nightly": airdna.get("airdna_avg", ""),
-        "airdna_pass": airdna.get("pass", ""),
         "link": item.get("link", ""),
-        "canonical": item.get("canonical", ""),
-        "property_key": item.get("property_key", ""),
-        "snippet": item.get("snippet", ""),
-        "search_provider": meta.get("search_provider", ""),
+        "listed_by": item.get("listed_by") or item.get("portal", ""),
+        "station": item.get("closest_station") or item.get("station", ""),
+        "rent": item.get("rent", ""),
+        "beds": item.get("beds", ""),
     }
 
 
