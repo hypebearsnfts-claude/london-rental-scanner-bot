@@ -2275,6 +2275,12 @@ def format_scanner_listing_batch(items: list[dict[str, Any]]) -> str:
 
 def scanner_export_row(item: dict[str, Any], meta: dict[str, Any], chat_id: int) -> dict[str, Any]:
     airdna = item.get("airdna") or {}
+    nightly_rate_needed = airdna.get("required_nightly", "")
+    if isinstance(nightly_rate_needed, (int, float)):
+        nightly_rate_needed = round(nightly_rate_needed)
+    airdna_adr = airdna.get("airdna_avg", "")
+    if isinstance(airdna_adr, (int, float)):
+        airdna_adr = round(airdna_adr)
     margin = airdna.get("margin", "")
     if isinstance(margin, (int, float)):
         margin = round(margin)
@@ -2283,6 +2289,8 @@ def scanner_export_row(item: dict[str, Any], meta: dict[str, Any], chat_id: int)
         "listed_by": item.get("listed_by") or item.get("portal", ""),
         "station": item.get("closest_station") or item.get("station", ""),
         "rent": item.get("rent", ""),
+        "nightly_rate_needed": nightly_rate_needed,
+        "airdna_adr": airdna_adr,
         "margin": margin,
         "beds": item.get("beds", ""),
     }
