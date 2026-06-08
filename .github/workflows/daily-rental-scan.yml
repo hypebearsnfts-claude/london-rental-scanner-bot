@@ -71,13 +71,16 @@ jobs:
             python3 telegram_bot.py --daily-scan
           fi
 
-      - name: Save sent-listing memory
+      - name: Save sent-listing memory and exports
         run: |
-          if ! git diff --quiet -- scanner_state.json; then
+          if [ -n "$(git status --porcelain -- scanner_state.json exports)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add scanner_state.json
-            git commit -m "Update rental scan state"
+            if [ -d exports ]; then
+              git add exports
+            fi
+            git commit -m "Update rental scan state and exports"
             git pull --rebase --autostash
             git push
           fi

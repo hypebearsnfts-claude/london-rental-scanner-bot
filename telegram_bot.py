@@ -8,6 +8,7 @@ BotFather, run this file, then send the bot a property listing URL in Telegram.
 
 from __future__ import annotations
 
+import csv
 import html
 from html.parser import HTMLParser
 import json
@@ -36,6 +37,7 @@ PLAYWRIGHT_VERIFY_DETAIL_PAGES_ENV = "PLAYWRIGHT_VERIFY_DETAIL_PAGES"
 OVERRIDES_FILE = "listing_overrides.json"
 LOG_FILE = "bot.log"
 SCANNER_STATE_FILE = "scanner_state.json"
+SCANNER_EXPORT_DIR = "exports"
 AIRDNA_RATES_FILE = "airdna_rates.json"
 LOCAL_TZ = ZoneInfo("Europe/London")
 DAILY_SCAN_HOUR = 12
@@ -2169,6 +2171,73 @@ def format_scanner_listing_batch(items: list[dict[str, Any]]) -> str:
     return "\n\n".join(format_scanner_listing(item) for item in items)
 
 
+def scanner_export_row(item: dict[str, Any], meta: dict[str, Any], chat_id: int) -> dict[str, Any]:
+    airdna = item.get("airdna") or {}
+    now = datetime.now(LOCAL_TZ)
+    return {
+        "scan_date": now.date().isoformat(),
+        "scan_time_london": now.strftime("%H:%M:%S"),
+        "chat_id": chat_id,
+        "portal": item.get("portal", ""),
+        "title": item.get("title", ""),
+        "address": item.get("address", ""),
+        "beds": item.get("beds", ""),
+        "rent_pcm": item.get("rent", ""),
+        "station_search": item.get("station", ""),
+        "closest_station": item.get("closest_station", ""),
+        "walking_minutes": item.get("walking_minutes", ""),
+        "live_status": item.get("live_status", ""),
+        "airdna_required_nightly": airdna.get("required_nightly", ""),
+        "airdna_avg_nightly": airdna.get("airdna_avg", ""),
+        "airdna_pass": airdna.get("pass", ""),
+        "link": item.get("link", ""),
+        "canonical": item.get("canonical", ""),
+        "property_key": item.get("property_key", ""),
+        "snippet": item.get("snippet", ""),
+        "search_provider": meta.get("search_provider", ""),
+    }
+
+
+def export_scanner_matches_csv(matches: list[dict[str, Any]], meta: dict[str, Any], chat_id: int) -> str | None:
+    if not matches:
+        return None
+
+    export_date = datetime.now(LOCAL_TZ).date().isoformat()
+    os.makedirs(SCANNER_EXPORT_DIR, exist_ok=True)
+    path = os.path.join(SCANNER_EXPORT_DIR, f"passed_listings_{export_date}.csv")
+    fieldnames = list(scanner_export_row(matches[0], meta, chat_id).keys())
+
+    existing_keys: set[str] = set()
+    if os.path.exists(path):
+        try:
+            with open(path, newline="", encoding="utf-8-sig") as existing_file:
+                for row in csv.DictReader(existing_file):
+                    existing_keys.add(row.get("canonical") or row.get("link") or "")
+        except (OSError, csv.Error):
+            existing_keys = set()
+
+    rows = []
+    for item in matches:
+        row = scanner_export_row(item, meta, chat_id)
+        key = str(row.get("canonical") or row.get("link") or "")
+        if key and key in existing_keys:
+            continue
+        if key:
+            existing_keys.add(key)
+        rows.append(row)
+
+    if not rows and os.path.exists(path):
+        return path
+
+    write_header = not os.path.exists(path) or os.path.getsize(path) == 0
+    with open(path, "a", newline="", encoding="utf-8-sig") as export_file:
+        writer = csv.DictWriter(export_file, fieldnames=fieldnames)
+        if write_header:
+            writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
 def scan_error_count(meta: dict[str, Any]) -> int:
     return sum(value for key, value in meta.get("skipped", {}).items() if key.startswith("search error:"))
 
@@ -3171,6 +3240,13 @@ class TelegramBot:
         self.send_message(chat_id, format_scan_summary(matches, meta))
         if not matches:
             return meta
+
+        try:
+            export_path = export_scanner_matches_csv(matches, meta, chat_id)
+            if export_path:
+                log_event(f"scan_export chat={chat_id} path={export_path} rows={len(matches)}")
+        except Exception as error:
+            log_event(f"scan_export_error chat={chat_id} {type(error).__name__}: {error}")
 
         state = load_scanner_state()
         sent_urls = set(state.get("sent_urls", []))
