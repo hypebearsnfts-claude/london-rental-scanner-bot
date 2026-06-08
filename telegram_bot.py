@@ -2274,11 +2274,16 @@ def format_scanner_listing_batch(items: list[dict[str, Any]]) -> str:
 
 
 def scanner_export_row(item: dict[str, Any], meta: dict[str, Any], chat_id: int) -> dict[str, Any]:
+    airdna = item.get("airdna") or {}
+    margin = airdna.get("margin", "")
+    if isinstance(margin, (int, float)):
+        margin = round(margin)
     return {
         "link": item.get("link", ""),
         "listed_by": item.get("listed_by") or item.get("portal", ""),
         "station": item.get("closest_station") or item.get("station", ""),
         "rent": item.get("rent", ""),
+        "margin": margin,
         "beds": item.get("beds", ""),
     }
 
