@@ -1981,7 +1981,6 @@ def scan_rental_listings_playwright(
                                     samples = skipped_samples.setdefault("detail blacklist verification unavailable", [])
                                     if len(samples) < 8:
                                         samples.append(link)
-                                    continue
 
                                 if (fingerprint_keys & seen_fingerprints_this_scan) or (property_key and property_key in seen_property_keys_this_scan):
                                     skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
