@@ -55,7 +55,12 @@ OLD_FMV_MAX_ABOVE_MARKET = 500
 AIRDNA_STR_MAX_ABOVE_ADR = int(os.environ.get("AIRDNA_STR_MAX_ABOVE_ADR", "50"))
 AIRDNA_FMV_CHECK_ENABLED = os.environ.get("AIRDNA_FMV_CHECK_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
 PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION = 50
-PLAYWRIGHT_NAV_TIMEOUT_MS = 18_000
+PLAYWRIGHT_NAV_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_NAV_TIMEOUT_MS", "12000"))
+PLAYWRIGHT_SEARCH_NETWORKIDLE_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_NETWORKIDLE_TIMEOUT_MS", "2500"))
+PLAYWRIGHT_DETAIL_NETWORKIDLE_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_NETWORKIDLE_TIMEOUT_MS", "0"))
+PLAYWRIGHT_DETAIL_SETTLE_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_SETTLE_MS", "250"))
+PLAYWRIGHT_DETAIL_TEXT_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_TEXT_TIMEOUT_MS", "2500"))
+FAST_DETAIL_FETCH_TIMEOUT_SECONDS = int(os.environ.get("FAST_DETAIL_FETCH_TIMEOUT_SECONDS", "6"))
 PLAYWRIGHT_SEARCH_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MIN_MS", "2500"))
 PLAYWRIGHT_SEARCH_PAUSE_MAX_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MAX_MS", "5500"))
 PLAYWRIGHT_DETAIL_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_PAUSE_MIN_MS", "1200"))
@@ -1767,21 +1772,57 @@ def playwright_prepare_search_results(page: Any, domain: str) -> None:
 
 
 def playwright_page_text(context: Any, url: str) -> tuple[str, str]:
+    try:
+        fast_title, fast_text = fetch_listing_text_fast(url)
+        if len(fast_text) >= 500 and not is_blocked_playwright_detail(fast_title, fast_text):
+            return fast_title, fast_text
+    except (urllib.error.URLError, TimeoutError, OSError, UnicodeError):
+        pass
+
     detail_page = context.new_page()
     try:
         playwright_polite_pause(detail_page, PLAYWRIGHT_DETAIL_PAUSE_MIN_MS, PLAYWRIGHT_DETAIL_PAUSE_MAX_MS)
         detail_page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
-        try:
-            detail_page.wait_for_load_state("networkidle", timeout=3500)
-        except Exception:
-            pass
+        if PLAYWRIGHT_DETAIL_NETWORKIDLE_TIMEOUT_MS > 0:
+            try:
+                detail_page.wait_for_load_state("networkidle", timeout=PLAYWRIGHT_DETAIL_NETWORKIDLE_TIMEOUT_MS)
+            except Exception:
+                pass
         playwright_accept_cookies(detail_page)
-        playwright_polite_pause(detail_page, 400, 1200)
+        if PLAYWRIGHT_DETAIL_SETTLE_MS > 0:
+            detail_page.wait_for_timeout(PLAYWRIGHT_DETAIL_SETTLE_MS)
         title = detail_page.title() or ""
-        text = detail_page.locator("body").inner_text(timeout=5000)
+        text = detail_page.locator("body").inner_text(timeout=PLAYWRIGHT_DETAIL_TEXT_TIMEOUT_MS)
         return title, compact_text(text, 9000)
     finally:
         detail_page.close()
+
+
+def fetch_listing_text_fast(url: str) -> tuple[str, str]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-GB,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=FAST_DETAIL_FETCH_TIMEOUT_SECONDS) as response:
+        content_type = response.headers.get("Content-Type", "")
+        raw = response.read(800_000)
+
+    charset = "utf-8"
+    charset_match = re.search(r"charset=([\w-]+)", content_type, re.IGNORECASE)
+    if charset_match:
+        charset = charset_match.group(1)
+    markup = raw.decode(charset, errors="replace")
+    parser = ListingHTMLParser()
+    parser.feed(markup)
+    title = parser.meta.get("og:title") or parser.title
+    return title, html_to_text(markup, 9000)
 
 
 def scan_rental_listings_playwright(
@@ -1852,10 +1893,11 @@ def scan_rental_listings_playwright(
                                 blocked_search_page = False
                                 for attempt in range(PLAYWRIGHT_SEARCH_RETRIES + 1):
                                     page.goto(url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
-                                    try:
-                                        page.wait_for_load_state("networkidle", timeout=4000)
-                                    except Exception:
-                                        pass
+                                    if PLAYWRIGHT_SEARCH_NETWORKIDLE_TIMEOUT_MS > 0:
+                                        try:
+                                            page.wait_for_load_state("networkidle", timeout=PLAYWRIGHT_SEARCH_NETWORKIDLE_TIMEOUT_MS)
+                                        except Exception:
+                                            pass
                                     playwright_polite_pause(page, PLAYWRIGHT_SEARCH_PAUSE_MIN_MS, PLAYWRIGHT_SEARCH_PAUSE_MAX_MS)
                                     playwright_prepare_search_results(page, domain)
                                     blocked_search_page = is_blocked_playwright_page(page)
@@ -1934,20 +1976,26 @@ def scan_rental_listings_playwright(
                                 title = result.get("title", "")
                                 snippet = search_snippet
                                 live_status = "search-card"
+                                detail_checked = False
+                                detail_blocked = False
                                 needs_furnishing_detail = furnishing_status(f"{title} {snippet}") is None
                                 if verify_detail_pages or needs_furnishing_detail:
                                     detail_pages_checked += 1
                                     try:
                                         detail_title, detail_text = playwright_page_text(context, link)
+                                        detail_checked = True
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
                                             title = detail_title or title
                                             snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)}"
                                             live_status = "verified"
+                                        else:
+                                            detail_blocked = True
                                         lowered = snippet.lower()
                                         if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
                                             skipped["not live"] = skipped.get("not live", 0) + 1
                                             continue
                                     except Exception as error:
+                                        detail_blocked = True
                                         skipped["detail page blocked"] = skipped.get("detail page blocked", 0) + 1
                                         samples = skipped_samples.setdefault("detail page blocked", [])
                                         if len(samples) < 8:
@@ -1974,9 +2022,21 @@ def scan_rental_listings_playwright(
                                     skipped["already sent property"] = skipped.get("already sent property", 0) + 1
                                     continue
 
-                                detail_checked = False
-                                detail_blocked = False
-                                if detail_pages_checked < SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT:
+                                if detail_checked and not detail_blocked:
+                                    detail_title = title
+                                    detail_snippet = snippet
+                                    detail_ok, detail_reason, detail_beds, detail_rent = passes_scanner_filters(detail_title, detail_snippet)
+                                    if not detail_ok:
+                                        skipped[detail_reason] = skipped.get(detail_reason, 0) + 1
+                                        continue
+                                    beds = detail_beds or beds
+                                    rent = detail_rent or rent
+                                    address = scanner_address_from_title(title, snippet)
+                                    fingerprint = listing_fingerprint(title, snippet, beds, rent, station, address=address)
+                                    legacy_fingerprint = legacy_listing_fingerprint(title, snippet, beds, rent, station)
+                                    property_key = property_identity_key(address, beds, rent)
+                                    fingerprint_keys = {fingerprint, legacy_fingerprint}
+                                elif detail_pages_checked < SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT:
                                     detail_pages_checked += 1
                                     try:
                                         detail_title, detail_text = playwright_page_text(context, link)
