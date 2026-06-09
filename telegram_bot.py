@@ -43,7 +43,7 @@ LOCAL_TZ = ZoneInfo("Europe/London")
 DAILY_SCAN_HOUR = 12
 SCANNER_LISTINGS_PER_MESSAGE = 6
 TELEGRAM_SEND_PAUSE_SECONDS = 1.05
-SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT = 120
+SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT = int(os.environ.get("SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT", "500"))
 SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
@@ -1965,6 +1965,16 @@ def scan_rental_listings_playwright(
                                             samples.append(f"{link} ({type(error).__name__})")
                                 else:
                                     skipped["detail blacklist check limit reached"] = skipped.get("detail blacklist check limit reached", 0) + 1
+                                    samples = skipped_samples.setdefault("detail blacklist check limit reached", [])
+                                    if len(samples) < 8:
+                                        samples.append(link)
+
+                                if not detail_checked or detail_blocked:
+                                    skipped["detail blacklist verification unavailable"] = skipped.get("detail blacklist verification unavailable", 0) + 1
+                                    samples = skipped_samples.setdefault("detail blacklist verification unavailable", [])
+                                    if len(samples) < 8:
+                                        samples.append(link)
+                                    continue
 
                                 if (fingerprint_keys & seen_fingerprints_this_scan) or (property_key and property_key in seen_property_keys_this_scan):
                                     skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
