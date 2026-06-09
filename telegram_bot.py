@@ -1572,18 +1572,28 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
     if domain == "zoopla.co.uk":
         return page.evaluate(
             """
-            () => Array.from(document.querySelectorAll('a[data-testid*="listing"]'))
+            () => Array.from(document.querySelectorAll('a[data-testid*="listing"], div[id^="listing_"] a[href*="/to-rent/details/"]'))
               .map(card => {
-                const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
+                const row = (
+                  card.closest('div[id^="listing_"], article, li, [data-testid*="listing-card"], [data-testid*="search-result"], [class*="ListingRow"], [class*="listingRow"], [class*="ListingCard"], [class*="listing-card"], [class*="SearchResult"]') ||
+                  card.parentElement?.closest('div[id^="listing_"], article, li, [data-testid*="listing-card"], [data-testid*="search-result"], [class*="ListingRow"], [class*="listingRow"], [class*="ListingCard"], [class*="listing-card"], [class*="SearchResult"]') ||
+                  card
+                );
+                const text = (row.innerText || card.innerText || '').replace(/\\s+/g, ' ').trim();
                 const href = card.href || '';
                 if (!href || href.includes('/new-homes/') || href.includes('/details/contact/') || /let\\s+agreed/i.test(text)) return null;
                 if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
                 if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
-                const address = (card.querySelector('[data-testid*="address"], [class*="address"], [class*="Address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
-                const title = address || card.querySelector('[data-testid*="title"], h2, [class*="title"], [class*="Title"]')?.innerText || text.slice(0, 100);
+                const address = (row.querySelector('[data-testid*="address"], [class*="address"], [class*="Address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
+                const title = address || row.querySelector('[data-testid*="title"], h2, [class*="title"], [class*="Title"]')?.innerText || text.slice(0, 100);
+                const logoAlt = Array.from(row.querySelectorAll('img[alt]'))
+                  .map(img => img.getAttribute('alt') || '')
+                  .find(alt => alt && !/^Property\\s+\\d+/i.test(alt) && !/floor\\s*plan/i.test(alt)) || '';
                 const agent = (
-                  card.querySelector('[data-testid="listing-agent-name"], [data-testid*="agent"], [class*="AgentName"], [class*="agent-name"], [class*="BranchName"]')?.innerText ||
-                  card.querySelector('img[alt*="logo" i], img[alt*="estate" i], img[alt*="letting" i]')?.getAttribute('alt') ||
+                  row.querySelector('[data-testid="listing-agent-name"], [data-testid*="agent"], [class*="AgentName"], [class*="agent-name"], [class*="BranchName"]')?.innerText ||
+                  row.querySelector('img[class*="agent" i], img[src*="agent_logo" i], img[alt*="logo" i], img[alt*="estate" i], img[alt*="letting" i]')?.getAttribute('alt') ||
+                  logoAlt ||
+                  (text.match(/(?:marketed|listed|added)\\s+by\\s+([^|]+?)(?:\\s+(?:£|\\d+\\s+(?:bed|beds|bedroom|bedrooms)|added|reduced|available|contact|call)\\b|$)/i)?.[1] || '') ||
                   ''
                 ).replace(/\\s+/g, ' ').replace(/\\s*logo\\s*$/i, '').trim();
                 return {title, link: href, snippet: text, source: location.hostname, date: '', listed_by: agent};
@@ -1882,7 +1892,8 @@ def scan_rental_listings_playwright(
                                     continue
 
                                 result["title"] = title_from_result_text(result.get("title", ""), result.get("snippet", ""))
-                                search_snippet = f"{result.get('snippet', '')} furnished long let to rent pcm"
+                                listed_by = result.get("listed_by", "")
+                                search_snippet = f"{listed_by} {result.get('snippet', '')} furnished long let to rent pcm"
                                 pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(result.get("title", ""), search_snippet)
                                 if not pre_ok:
                                     skipped[pre_reason] = skipped.get(pre_reason, 0) + 1
@@ -1906,7 +1917,7 @@ def scan_rental_listings_playwright(
                                         detail_title, detail_text = playwright_page_text(context, link)
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
                                             title = detail_title or title
-                                            snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
+                                            snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
                                             live_status = "verified"
                                         lowered = snippet.lower()
                                         if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
@@ -1948,7 +1959,7 @@ def scan_rental_listings_playwright(
                                         detail_checked = True
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
                                             detail_title = detail_title or title
-                                            detail_snippet = f"{result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
+                                            detail_snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
                                             detail_ok, detail_reason, detail_beds, detail_rent = passes_scanner_filters(detail_title, detail_snippet)
                                             if not detail_ok:
                                                 skipped[detail_reason] = skipped.get(detail_reason, 0) + 1
