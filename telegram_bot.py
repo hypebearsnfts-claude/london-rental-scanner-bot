@@ -143,6 +143,8 @@ SCANNER_BLACKLISTED_KEYWORDS = [
     "chestertons",
     "knight frank",
     "dexters",
+    "john d wood",
+    "john d wood & co",
     "tavistock bow",
     "ila",
     "219baker",
@@ -868,6 +870,17 @@ def scanner_blacklist_hit(text: str) -> bool:
     return any(pattern.search(text) for pattern in SCANNER_BLACKLISTED_PATTERNS)
 
 
+def furnishing_status(text: str) -> str | None:
+    lowered = text.lower()
+    if "part furnished" in lowered or "part-furnished" in lowered:
+        return "part furnished"
+    if "unfurnished" in lowered or "un-furnished" in lowered:
+        return "unfurnished"
+    if re.search(r"\bfurnished\b", lowered):
+        return "furnished"
+    return None
+
+
 def listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station: str, address: str = "") -> str:
     text = normalized_listing_text(address or f"{title} {snippet}")
     tokens = [token for token in text.split() if len(token) > 2 and token not in ADDRESS_GENERIC_TOKENS][:12]
@@ -1292,10 +1305,21 @@ def closest_watched_station(origin: str, google_key: str, preferred_station: str
     return best
 
 
-def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | None, int | None]:
+def passes_scanner_filters(
+    title: str,
+    snippet: str,
+    require_furnished_visible: bool = True,
+    require_long_let_visible: bool = True,
+) -> tuple[bool, str, int | None, int | None]:
     text = f"{title} {snippet}"
     lowered = text.lower()
-    if any(term in lowered for term in ["room to rent", "house share", "flat share", "shared accommodation", "student accommodation", "double room", "single room", "large bright bedroom", "room in a"]):
+    furnishing = furnishing_status(text)
+    if furnishing == "unfurnished":
+        return False, "unfurnished", None, None
+    if furnishing == "part furnished":
+        return False, "part furnished", None, None
+    shared_terms = ["room to rent", "house share", "flat share", "shared accommodation", "double room", "single room", "large bright bedroom", "room in a"]
+    if any(term in lowered for term in shared_terms) or re.search(r"\bstudent\s+(?:flat|house|let|rental|property)\b", lowered):
         return False, "shared/student accommodation", None, None
     if scanner_blacklist_hit(text):
         return False, "contains concierge/blacklisted service", None, None
@@ -1307,13 +1331,9 @@ def passes_scanner_filters(title: str, snippet: str) -> tuple[bool, str, int | N
         return False, "short let", None, None
     if looks_outside_watched_london_area(text):
         return False, "outside watched London area", None, None
-    if "unfurnished" in lowered:
-        return False, "unfurnished", None, None
-    if "part furnished" in lowered or "part-furnished" in lowered:
-        return False, "part furnished", None, None
-    if "furnished" not in lowered:
+    if require_furnished_visible and furnishing != "furnished":
         return False, "furnished not visible", None, None
-    if not any(term in lowered for term in ["long let", "long-let", "to rent", "pcm", "per month"]):
+    if require_long_let_visible and not any(term in lowered for term in ["long let", "long-let", "to rent", "pcm", "per month"]):
         return False, "long let not visible", None, None
 
     beds = extract_bedrooms(text)
@@ -1893,8 +1913,13 @@ def scan_rental_listings_playwright(
 
                                 result["title"] = title_from_result_text(result.get("title", ""), result.get("snippet", ""))
                                 listed_by = result.get("listed_by", "")
-                                search_snippet = f"{listed_by} {result.get('snippet', '')} furnished long let to rent pcm"
-                                pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(result.get("title", ""), search_snippet)
+                                search_snippet = f"{listed_by} {result.get('snippet', '')}"
+                                pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(
+                                    result.get("title", ""),
+                                    search_snippet,
+                                    require_furnished_visible=False,
+                                    require_long_let_visible=False,
+                                )
                                 if not pre_ok:
                                     skipped[pre_reason] = skipped.get(pre_reason, 0) + 1
                                     if pre_reason in {"bedrooms not visible", "rent not visible"}:
@@ -1911,13 +1936,14 @@ def scan_rental_listings_playwright(
                                 title = result.get("title", "")
                                 snippet = search_snippet
                                 live_status = "search-card"
-                                if verify_detail_pages:
+                                needs_furnishing_detail = furnishing_status(f"{title} {snippet}") is None
+                                if verify_detail_pages or needs_furnishing_detail:
                                     detail_pages_checked += 1
                                     try:
                                         detail_title, detail_text = playwright_page_text(context, link)
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
                                             title = detail_title or title
-                                            snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
+                                            snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)}"
                                             live_status = "verified"
                                         lowered = snippet.lower()
                                         if any(term in lowered for term in ["no longer on the market", "no longer available", "not currently available", "property has been removed", "this property has been removed", "let agreed", "let by", "now let"]):
@@ -1959,7 +1985,7 @@ def scan_rental_listings_playwright(
                                         detail_checked = True
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
                                             detail_title = detail_title or title
-                                            detail_snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)} furnished long let to rent pcm"
+                                            detail_snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)}"
                                             detail_ok, detail_reason, detail_beds, detail_rent = passes_scanner_filters(detail_title, detail_snippet)
                                             if not detail_ok:
                                                 skipped[detail_reason] = skipped.get(detail_reason, 0) + 1
