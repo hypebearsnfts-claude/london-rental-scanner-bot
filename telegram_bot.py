@@ -61,6 +61,7 @@ PLAYWRIGHT_DETAIL_NETWORKIDLE_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_DETAIL
 PLAYWRIGHT_DETAIL_SETTLE_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_SETTLE_MS", "250"))
 PLAYWRIGHT_DETAIL_TEXT_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_TEXT_TIMEOUT_MS", "2500"))
 FAST_DETAIL_FETCH_TIMEOUT_SECONDS = int(os.environ.get("FAST_DETAIL_FETCH_TIMEOUT_SECONDS", "6"))
+PLAYWRIGHT_STOP_AFTER_STALE_PAGES = int(os.environ.get("PLAYWRIGHT_STOP_AFTER_STALE_PAGES", "2"))
 PLAYWRIGHT_SEARCH_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MIN_MS", "2500"))
 PLAYWRIGHT_SEARCH_PAUSE_MAX_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_PAUSE_MAX_MS", "5500"))
 PLAYWRIGHT_DETAIL_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_PAUSE_MIN_MS", "1200"))
@@ -1870,6 +1871,7 @@ def scan_rental_listings_playwright(
             for station in scan_stations:
                 for domain in scan_domains:
                     seen_page_links: set[str] = set()
+                    stale_pages = 0
                     page_index = 0
                     while max_pages is None or page_index < max_pages:
                         url = playwright_search_url(domain, station, page_index)
@@ -1940,6 +1942,22 @@ def scan_rental_listings_playwright(
                                         samples.append(playwright_search_diagnostic(page, url))
                                 break
                             portal_stats[domain]["detail_links"] += len(new_detail_links)
+
+                            if not include_seen and PLAYWRIGHT_STOP_AFTER_STALE_PAGES > 0:
+                                fresh_links = [
+                                    result["link"]
+                                    for result in new_detail_links
+                                    if result["link"] not in sent_urls and result["link"] not in seen_this_scan
+                                ]
+                                if not fresh_links:
+                                    stale_pages += 1
+                                    skipped["stale search page"] = skipped.get("stale search page", 0) + 1
+                                    if stale_pages >= PLAYWRIGHT_STOP_AFTER_STALE_PAGES:
+                                        skipped["stopped after stale pages"] = skipped.get("stopped after stale pages", 0) + 1
+                                        break
+                                    page_index += 1
+                                    continue
+                                stale_pages = 0
 
                             for result in new_detail_links:
                                 link = result["link"]
