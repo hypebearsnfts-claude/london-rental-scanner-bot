@@ -143,8 +143,6 @@ SCANNER_BLACKLISTED_KEYWORDS = [
     "chestertons",
     "knight frank",
     "dexters",
-    "john d wood",
-    "john d wood & co",
     "tavistock bow",
     "ila",
     "219baker",
