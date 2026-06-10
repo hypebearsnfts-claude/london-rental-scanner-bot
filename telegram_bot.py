@@ -885,6 +885,30 @@ def furnishing_status(text: str) -> str | None:
     return None
 
 
+def is_generic_listing_agency(value: str, portal: str = "") -> bool:
+    normalized = normalized_listing_text(value)
+    portal_normalized = normalized_listing_text(portal)
+    return not normalized or normalized in {"rightmove", "zoopla", "onthemarket", "openrent"} or normalized == portal_normalized
+
+
+def extract_listing_agency_from_text(text: str, portal: str = "") -> str:
+    compact = compact_text(text, 9000)
+    patterns = [
+        r"\bRequest viewing/info\s+(.+?)(?=\s+(?:Unit\s+[A-Z0-9]|\d{1,5}\s+[A-Z][a-z]|\d{3,5}\s|[A-Z]{1,2}\d[A-Z\d]?\s|\bTotal views\b|\bPhotos\b|\bFloorplan\b))",
+        r"\bAbout this agent\s+(.+?)(?=\s+\d{1,5}\s+[A-Z][a-z]|\s+Full profile\b|\s+Property listings\b)",
+        r"\b(?:Marketed by|Listed by)\s+(.+?)(?=\s+(?:\d{1,5}\s+[A-Z][a-z]|\d{3,5}\s|[A-Z]{1,2}\d[A-Z\d]?\s|\bCall\b|\bEmail\b))",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, compact, re.IGNORECASE)
+        if not match:
+            continue
+        agency = compact_text(match.group(1), 90)
+        agency = re.sub(r"\s+(?:Call agent|Request viewing/info|Total views).*$", "", agency, flags=re.IGNORECASE).strip(" -|,")
+        if not is_generic_listing_agency(agency, portal):
+            return agency
+    return ""
+
+
 def listing_fingerprint(title: str, snippet: str, beds: int, rent: int, station: str, address: str = "") -> str:
     text = normalized_listing_text(address or f"{title} {snippet}")
     tokens = [token for token in text.split() if len(token) > 2 and token not in ADDRESS_GENERIC_TOKENS][:12]
@@ -1971,6 +1995,7 @@ def scan_rental_listings_playwright(
 
                                 result["title"] = title_from_result_text(result.get("title", ""), result.get("snippet", ""))
                                 listed_by = result.get("listed_by", "")
+                                portal_name = portal_from_link(link)
                                 search_snippet = f"{listed_by} {result.get('snippet', '')}"
                                 pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(
                                     result.get("title", ""),
@@ -2003,6 +2028,10 @@ def scan_rental_listings_playwright(
                                         detail_title, detail_text = playwright_page_text(context, link)
                                         detail_checked = True
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
+                                            detail_agency = extract_listing_agency_from_text(detail_text, portal_name)
+                                            if detail_agency and is_generic_listing_agency(listed_by, portal_name):
+                                                listed_by = detail_agency
+                                                result["listed_by"] = detail_agency
                                             title = detail_title or title
                                             snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)}"
                                             live_status = "verified"
@@ -2060,6 +2089,10 @@ def scan_rental_listings_playwright(
                                         detail_title, detail_text = playwright_page_text(context, link)
                                         detail_checked = True
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
+                                            detail_agency = extract_listing_agency_from_text(detail_text, portal_name)
+                                            if detail_agency and is_generic_listing_agency(listed_by, portal_name):
+                                                listed_by = detail_agency
+                                                result["listed_by"] = detail_agency
                                             detail_title = detail_title or title
                                             detail_snippet = f"{listed_by} {result.get('snippet', '')} {compact_text(detail_text, 5000)}"
                                             detail_ok, detail_reason, detail_beds, detail_rent = passes_scanner_filters(detail_title, detail_snippet)
@@ -2134,8 +2167,8 @@ def scan_rental_listings_playwright(
                                         "snippet": compact_text(snippet, 180),
                                         "link": link,
                                         "canonical": canonical,
-                                        "portal": portal_from_link(link),
-                                        "listed_by": result.get("listed_by") or portal_from_link(link),
+                                        "portal": portal_name,
+                                        "listed_by": result.get("listed_by") or portal_name,
                                         "station": station,
                                         "closest_station": closest["station"],
                                         "walking_minutes": closest["minutes"],
