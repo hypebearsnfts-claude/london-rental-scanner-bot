@@ -84,29 +84,34 @@ BED_RE = re.compile(r"\b([1-8])\s*(?:bed|beds|bedroom|bedrooms|br)\b", re.IGNORE
 _AIRDNA_RATES_CACHE: dict[str, Any] | None = None
 
 WATCH_STATIONS = [
-    "Kensington Olympia",
-    "Bayswater",
-    "Lancaster Gate",
-    "Gloucester Road",
-    "South Kensington",
-    "Marble Arch",
-    "Bond Street",
-    "Baker Street",
-    "Regent Park",
-    "Oxford Circus",
-    "Tottenham Court Road",
     "Covent Garden",
-    "Leicester Square",
-    "Piccadilly Circus",
+    "Soho",
+    "Baker Street",
+    "Bond Street",
+    "Marble Arch",
+    "Oxford Circus",
+    "Marylebone",
+    "Regent's Park",
+    "Kensington Olympia",
     "Holborn",
+    "Chancery Lane",
+    "Farringdon",
+    "Angel",
+    "Old Street",
     "Charing Cross",
     "Victoria",
+    "King's Cross St Pancras",
+    "Goodge Street",
+    "Russell Square",
+    "Gloucester Road",
+    "Lancaster Gate",
 ]
 
 STATION_ALIASES = {
     "Kensington Olympia": ["Kensington Olympia", "Kensington (Olympia)"],
-    "Regent Park": ["Regent Park", "Regent's Park"],
-    "Piccadilly Circus": ["Piccadilly Circus", "Picadilly Circus"],
+    "Regent's Park": ["Regent's Park", "Regent Park"],
+    "Soho": ["Soho", "Piccadilly Circus"],
+    "King's Cross St Pancras": ["King's Cross St Pancras", "King's Cross", "Kings Cross St Pancras"],
 }
 
 WATCH_PORTALS = {
@@ -164,62 +169,84 @@ SCANNER_BLACKLISTED_PATTERNS = [
 ]
 
 RIGHTMOVE_LOCATION_IDS = {
-    # Rightmove locationIdentifier values from the reference scraper map.
-    "Angel": "STATION^339",
+    # Rightmove locationIdentifier values copied from the reference scraper map.
+    "Covent Garden": "REGION^87501",
+    "Soho": "REGION^87529",
     "Baker Street": "STATION^488",
     "Bond Street": "STATION^1166",
-    "Chancery Lane": "STATION^1920",
-    "Charing Cross": "STATION^1936",
-    "Covent Garden": "REGION^87501",
-    "Farringdon": "STATION^3552",
-    "Gloucester Road": "STATION^3809",
-    "Goodge Street": "STATION^3863",
-    "Holborn": "STATION^4668",
-    "Kensington Olympia": "STATION^5011",
-    "King's Cross St Pancras": "STATION^5165",
-    "Lancaster Gate": "STATION^5354",
     "Marble Arch": "STATION^6032",
-    "Marylebone": "STATION^6095",
-    "Old Street": "STATION^6855",
     "Oxford Circus": "STATION^6953",
-    "Piccadilly Circus": "REGION^87529",
-    "Regent Park": "STATION^7658",
+    "Marylebone": "STATION^6095",
     "Regent's Park": "STATION^7658",
-    "Russell Square": "STATION^7877",
-    "Soho": "REGION^87529",
+    "Kensington Olympia": "STATION^5011",
+    "Holborn": "STATION^4668",
+    "Chancery Lane": "STATION^1920",
+    "Farringdon": "STATION^3552",
+    "Angel": "STATION^339",
+    "Old Street": "STATION^6855",
+    "Charing Cross": "STATION^1936",
     "Victoria": "STATION^9491",
+    "King's Cross St Pancras": "STATION^5165",
+    "Goodge Street": "STATION^3863",
+    "Russell Square": "STATION^7877",
+    "Gloucester Road": "STATION^3809",
+    "Lancaster Gate": "STATION^5354",
+
+    # Backward-compatible alias; not part of WATCH_STATIONS.
+    "Regent Park": "STATION^7658",
 }
 
-RIGHTMOVE_STATION_ID_GAPS = {
-    # Not present in the current Rightmove reference map supplied by the user.
-    "Bayswater",
-    "South Kensington",
-    "Tottenham Court Road",
-    "Leicester Square",
-}
+RIGHTMOVE_STATION_ID_GAPS = set()
 
 STATION_SLUGS = {
-    "Kensington Olympia": "kensington-olympia",
-    "Bayswater": "bayswater",
-    "Lancaster Gate": "lancaster-gate",
-    "Gloucester Road": "gloucester-road",
-    "South Kensington": "south-kensington",
-    "Marble Arch": "marble-arch",
-    "Bond Street": "bond-street",
-    "Baker Street": "baker-street",
-    "Regent Park": "regents-park",
-    "Oxford Circus": "oxford-circus",
-    "Tottenham Court Road": "tottenham-court-road",
     "Covent Garden": "covent-garden",
-    "Leicester Square": "leicester-square",
-    "Piccadilly Circus": "piccadilly-circus",
+    "Soho": "piccadilly-circus",
+    "Baker Street": "baker-street",
+    "Bond Street": "bond-street",
+    "Marble Arch": "marble-arch",
+    "Oxford Circus": "oxford-circus",
+    "Marylebone": "marylebone",
+    "Regent's Park": "regents-park",
+    "Kensington Olympia": "kensington-olympia",
     "Holborn": "holborn",
+    "Chancery Lane": "chancery-lane",
+    "Farringdon": "farringdon",
+    "Angel": "angel",
+    "Old Street": "old-street",
     "Charing Cross": "charing-cross",
     "Victoria": "victoria",
+    "King's Cross St Pancras": "kings-cross-st-pancras",
+    "Goodge Street": "goodge-street",
+    "Russell Square": "russell-square",
+    "Gloucester Road": "gloucester-road",
+    "Lancaster Gate": "lancaster-gate",
+
+    # Backward-compatible alias; not part of WATCH_STATIONS.
+    "Regent Park": "regents-park",
 }
 
-ONTHEMARKET_LOCATION_SLUGS = {
-    "Victoria": "london-victoria",
+OPENRENT_LOCATION_TERMS = {
+    "Covent Garden": ("covent-garden-london", "Covent Garden, London"),
+    "Soho": ("soho-london", "Soho, London"),
+    "Baker Street": ("baker-street-london", "Baker Street, London"),
+    "Bond Street": ("bond-street-london", "Bond Street, London"),
+    "Marble Arch": ("marble-arch-london", "Marble Arch, London"),
+    "Oxford Circus": ("oxford-circus-london", "Oxford Circus, London"),
+    "Marylebone": ("marylebone-london", "Marylebone, London"),
+    "Regent's Park": ("regents-park-london", "Regent's Park, London"),
+    "Kensington Olympia": ("kensington-olympia-london", "Kensington Olympia, London"),
+    "Holborn": ("holborn-london", "Holborn, London"),
+    "Chancery Lane": ("chancery-lane-london", "Chancery Lane, London"),
+    "Farringdon": ("farringdon-london", "Farringdon, London"),
+    "Angel": ("angel-london", "Angel, London"),
+    "Old Street": ("old-street-london", "Old Street, London"),
+    "Charing Cross": ("charing-cross-london", "Charing Cross, London"),
+    "Victoria": ("victoria-london", "Victoria, London"),
+    "King's Cross St Pancras": ("kings-cross-london", "King's Cross, London"),
+    "Goodge Street": ("goodge-street-london", "Goodge Street, London"),
+    "Russell Square": ("russell-square-london", "Russell Square, London"),
+    "Gloucester Road": ("gloucester-road-london", "Gloucester Road, London"),
+    "Lancaster Gate": ("lancaster-gate-london", "Lancaster Gate, London"),
 }
 
 
@@ -1455,7 +1482,6 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             pn=page_index + 1,
         )
     if domain == "onthemarket.com":
-        slug = ONTHEMARKET_LOCATION_SLUGS.get(station, slug)
         url = f"https://www.onthemarket.com/to-rent/property/{slug}-station/"
         return add_query_params(
             url,
@@ -1470,10 +1496,11 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             },
         )
     if domain == "openrent.co.uk":
-        url = f"https://www.openrent.co.uk/properties-to-rent/{slug}-london"
+        openrent_slug, openrent_term = OPENRENT_LOCATION_TERMS.get(station, (f"{slug}-london", f"{station}, London"))
+        url = f"https://www.openrent.co.uk/properties-to-rent/{openrent_slug}"
         return add_query_params(
             url,
-            term=f"{station}, London",
+            term=openrent_term,
             bedrooms_min=2,
             bedrooms_max=8,
             max_rent=14000,
