@@ -1903,7 +1903,11 @@ def scan_rental_listings_playwright(
         domain: {"pages": 0, "raw_results": 0, "detail_links": 0, "sent": 0}
         for domain in scan_domains
     }
-    max_pages = max_pages_per_portal_station
+    max_pages = (
+        max_pages_per_portal_station
+        if max_pages_per_portal_station is not None
+        else PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION
+    )
     verify_detail_pages = playwright_should_verify_detail_pages()
     pages_checked = 0
     detail_pages_checked = 0
@@ -1921,10 +1925,11 @@ def scan_rental_listings_playwright(
         try:
             for station in scan_stations:
                 for domain in scan_domains:
+                    log_event(f"scan_progress station={station} portal={domain} start")
                     seen_page_links: set[str] = set()
                     stale_pages = 0
                     page_index = 0
-                    while max_pages is None or page_index < max_pages:
+                    while page_index < max_pages:
                         url = playwright_search_url(domain, station, page_index)
                         if not url:
                             reason = f"no station URL for {domain}"
@@ -2214,9 +2219,14 @@ def scan_rental_listings_playwright(
                                 )
                                 portal_stats[domain]["sent"] += 1
                             page_index += 1
-                            page.close()
                         finally:
                             context.close()
+                    if page_index >= max_pages:
+                        skipped["page safety cap reached"] = skipped.get("page safety cap reached", 0) + 1
+                        samples = skipped_samples.setdefault("page safety cap reached", [])
+                        if len(samples) < 12:
+                            samples.append(f"{station} {domain} max_pages={max_pages}")
+                    log_event(f"scan_progress station={station} portal={domain} done pages={page_index}")
         finally:
             browser.close()
 
