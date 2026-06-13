@@ -2054,7 +2054,7 @@ def scan_rental_listings_playwright(
                                 detail_checked = False
                                 detail_blocked = False
                                 needs_furnishing_detail = furnishing_status(f"{title} {snippet}") is None
-                                if verify_detail_pages or needs_furnishing_detail:
+                                if (verify_detail_pages or needs_furnishing_detail) and detail_pages_checked < SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT:
                                     detail_pages_checked += 1
                                     try:
                                         detail_title, detail_text = playwright_page_text(context, link)
@@ -2080,6 +2080,11 @@ def scan_rental_listings_playwright(
                                         if len(samples) < 8:
                                             samples.append(f"{link} ({type(error).__name__})")
                                         continue
+                                elif verify_detail_pages or needs_furnishing_detail:
+                                    skipped["detail blacklist check limit reached"] = skipped.get("detail blacklist check limit reached", 0) + 1
+                                    samples = skipped_samples.setdefault("detail blacklist check limit reached", [])
+                                    if len(samples) < 8:
+                                        samples.append(link)
 
                                 ok, reason, beds, rent = passes_scanner_filters(title, snippet)
                                 if not ok:
