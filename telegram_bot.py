@@ -1888,6 +1888,7 @@ def scan_rental_listings_playwright(
 
     state = load_scanner_state()
     sent_urls = set(state.get("sent_urls", []))
+    checked_urls = set(state.get("checked_urls", []))
     sent_fingerprints = set(state.get("sent_fingerprints", []))
     sent_property_keys = set(state.get("sent_property_keys", []))
     matches: list[dict[str, Any]] = []
@@ -2003,7 +2004,11 @@ def scan_rental_listings_playwright(
                                 fresh_links = [
                                     result["link"]
                                     for result in new_detail_links
-                                    if result["link"] not in sent_urls and result["link"] not in seen_this_scan
+                                    if (
+                                        result["link"] not in sent_urls
+                                        and result["link"] not in checked_urls
+                                        and result["link"] not in seen_this_scan
+                                    )
                                 ]
                                 if not fresh_links:
                                     stale_pages += 1
@@ -2018,12 +2023,17 @@ def scan_rental_listings_playwright(
                             for result in new_detail_links:
                                 link = result["link"]
                                 canonical = canonical_listing_url(link)
-                                if not canonical or canonical in seen_this_scan:
+                                if not canonical:
                                     continue
-                                seen_this_scan.add(canonical)
                                 if canonical in sent_urls and not include_seen:
                                     skipped["already sent"] = skipped.get("already sent", 0) + 1
                                     continue
+                                if canonical in checked_urls and not include_seen:
+                                    skipped["already checked"] = skipped.get("already checked", 0) + 1
+                                    continue
+                                if canonical in seen_this_scan:
+                                    continue
+                                seen_this_scan.add(canonical)
 
                                 result["title"] = title_from_result_text(result.get("title", ""), result.get("snippet", ""))
                                 listed_by = result.get("listed_by", "")
@@ -2234,6 +2244,13 @@ def scan_rental_listings_playwright(
                     log_event(f"scan_progress station={station} portal={domain} done pages={page_index}")
         finally:
             browser.close()
+
+    if seen_this_scan and not include_seen:
+        state = load_scanner_state()
+        remembered_checked_urls = set(state.get("checked_urls", []))
+        remembered_checked_urls.update(seen_this_scan)
+        state["checked_urls"] = sorted(remembered_checked_urls)
+        save_scanner_state(state)
 
     matches = dedupe_scanner_matches(matches)
     matches.sort(key=lambda item: (item["rent"], item["beds"], item["station"]))
