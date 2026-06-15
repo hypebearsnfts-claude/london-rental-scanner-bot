@@ -1904,6 +1904,7 @@ def scan_rental_listings_playwright(
         domain: {"pages": 0, "raw_results": 0, "detail_links": 0, "sent": 0}
         for domain in scan_domains
     }
+    blocked_domains: set[str] = set()
     max_pages = (
         max_pages_per_portal_station
         if max_pages_per_portal_station is not None
@@ -1926,6 +1927,9 @@ def scan_rental_listings_playwright(
         try:
             for station in scan_stations:
                 for domain in scan_domains:
+                    if domain in blocked_domains:
+                        skipped["portal skipped after security block"] = skipped.get("portal skipped after security block", 0) + 1
+                        continue
                     log_event(f"scan_progress station={station} portal={domain} start")
                     seen_page_links: set[str] = set()
                     stale_pages = 0
@@ -1973,6 +1977,8 @@ def scan_rental_listings_playwright(
                                     samples = skipped_samples.setdefault("portal security blocked", [])
                                     if len(samples) < 8:
                                         samples.append(playwright_search_diagnostic(page, url))
+                                    if domain == "openrent.co.uk":
+                                        blocked_domains.add(domain)
                                     break
                             except Exception as error:
                                 key = f"playwright search error: {station} {domain}: {type(error).__name__}"

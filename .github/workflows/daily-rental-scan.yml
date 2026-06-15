@@ -22,7 +22,7 @@ permissions:
 
 concurrency:
   group: daily-rental-scan
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   scan:
