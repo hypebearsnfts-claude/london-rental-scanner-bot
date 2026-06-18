@@ -71,6 +71,8 @@ PLAYWRIGHT_SEARCH_RETRIES = int(os.environ.get("PLAYWRIGHT_SEARCH_RETRIES", "1")
 REQUIRE_LIVE_DETAIL_VERIFICATION = True
 MAX_WALKING_MINUTES = 8
 USE_GOOGLE_MAPS_WALKING_FILTER = False
+OPENRENT_MAX_DISTANCE_MILES = 0.5
+OPENRENT_MAX_DISTANCE_KM = OPENRENT_MAX_DISTANCE_MILES * 1.609344
 URL_RE = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
 TAG_RE = re.compile(r"<[^>]+>")
 SCRIPT_STYLE_RE = re.compile(r"<(script|style|noscript).*?</\1>", re.IGNORECASE | re.DOTALL)
@@ -1311,6 +1313,21 @@ def looks_outside_watched_london_area(text: str) -> bool:
     return outward_prefix not in {"W", "NW", "SW", "WC", "EC", "SE"}
 
 
+def openrent_distance_km(text: str) -> float | None:
+    km_match = re.search(r"\b([0-9]+(?:\.[0-9]+)?)\s*km\b", text, re.IGNORECASE)
+    if km_match:
+        return float(km_match.group(1))
+    mile_match = re.search(r"\b([0-9]+(?:\.[0-9]+)?)\s*miles?\b", text, re.IGNORECASE)
+    if mile_match:
+        return float(mile_match.group(1)) * 1.609344
+    return None
+
+
+def openrent_outside_radius(text: str) -> bool:
+    distance_km = openrent_distance_km(text)
+    return distance_km is not None and distance_km > OPENRENT_MAX_DISTANCE_KM + 1e-6
+
+
 def station_destination(station: str) -> str:
     return f"{station} station, London, UK"
 
@@ -1388,7 +1405,7 @@ def passes_scanner_filters(
         return False, "outside watched London area", None, None
     if require_furnished_visible and furnishing != "furnished":
         return False, "furnished not visible", None, None
-    if require_long_let_visible and not any(term in lowered for term in ["long let", "long-let", "to rent", "pcm", "per month"]):
+    if require_long_let_visible and not any(term in lowered for term in ["long let", "long-let", "to rent", "pcm", "per month", "/month"]):
         return False, "long let not visible", None, None
 
     beds = extract_bedrooms(text)
@@ -1706,12 +1723,19 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-+|-+$/g, '')
                 .slice(0, 90) || 'listing';
+              const maxKm = 0.5 * 1.609344;
               return Array.from(document.querySelectorAll('a.pli[id^="p"], div.property-result a'))
                 .map(card => {
                   const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                   if (!text || /let\\s+agreed/i.test(text)) return null;
                   if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
                   if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
+                  const kmMatch = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*km\\b/i);
+                  const mileMatch = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*miles?\\b/i);
+                  let distanceKm = null;
+                  if (kmMatch) distanceKm = parseFloat(kmMatch[1]);
+                  else if (mileMatch) distanceKm = parseFloat(mileMatch[1]) * 1.609344;
+                  if (distanceKm !== null && distanceKm > maxKm + 0.000001) return null;
                   const id = (card.id || '').replace(/^p/, '');
                   let href = card.href || '';
                   const titleMatch = text.match(/\\d+\\s+Bed\\s+[^,]+,\\s*[^£]+?(?=\\s+(?:We|Available|Beautifully|Modern|This|A\\s|\\d+\\s+Beds|View Details|$))/i);
@@ -2045,6 +2069,12 @@ def scan_rental_listings_playwright(
                                 listed_by = result.get("listed_by", "")
                                 portal_name = portal_from_link(link)
                                 search_snippet = f"{listed_by} {result.get('snippet', '')}"
+                                if domain == "openrent.co.uk" and openrent_outside_radius(search_snippet):
+                                    skipped["outside OpenRent 0.5 mile radius"] = skipped.get("outside OpenRent 0.5 mile radius", 0) + 1
+                                    samples = skipped_samples.setdefault("outside OpenRent 0.5 mile radius", [])
+                                    if len(samples) < 8:
+                                        samples.append(compact_text(f"{link} | {search_snippet}", 500))
+                                    continue
                                 pre_ok, pre_reason, _pre_beds, _pre_rent = passes_scanner_filters(
                                     result.get("title", ""),
                                     search_snippet,
