@@ -1515,7 +1515,7 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
     if domain == "openrent.co.uk":
         openrent_slug, openrent_term = OPENRENT_LOCATION_TERMS.get(station, (f"{slug}-london", f"{station}, London"))
         url = f"https://www.openrent.co.uk/properties-to-rent/{openrent_slug}"
-        return add_query_params(
+        params = add_query_params(
             url,
             term=openrent_term,
             bedrooms_min=2,
@@ -1525,6 +1525,9 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             isLive="true",
             radius="0.5",
         )
+        if page_index > 0:
+            params = add_query_params(params, skip=page_index * 20)
+        return params
     return f"https://www.{domain}/"
 
 
@@ -1748,6 +1751,78 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
             """
         )
     return playwright_collect_links(page)
+
+
+def openrent_fetch_html(url: str) -> str | None:
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    }
+    try:
+        from curl_cffi import requests as creq
+
+        response = creq.get(url, headers=headers, impersonate="chrome124", timeout=30)
+        if response.status_code == 200 and "/property-to-rent/london/" in response.text:
+            return response.text
+    except Exception:
+        pass
+    return None
+
+
+def openrent_results_from_html(markup: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for match in re.finditer(
+        r'<a\b[^>]*href=["\'](?P<href>/property-to-rent/london/[^"\']+/\d+)["\'][^>]*class=["\'][^"\']*\bpli\b[^"\']*["\'][^>]*>(?P<body>.*?)</a>',
+        markup,
+        re.IGNORECASE | re.DOTALL,
+    ):
+        href = html.unescape(match.group("href"))
+        link = canonical_listing_url("https://www.openrent.co.uk" + href)
+        if link in seen:
+            continue
+        seen.add(link)
+        body = match.group("body")
+        text = html_to_text(body, 2500)
+        if not text or re.search(r"\blet\s+agreed\b", text, re.IGNORECASE):
+            continue
+        if openrent_outside_radius(text):
+            continue
+        beds = extract_bedrooms(text)
+        rent = extract_asking_rent(text)
+        if beds is None or beds < 2 or rent is None:
+            continue
+        title_match = re.search(
+            r"\b([2-8]\s+Bed\s+(?:Flat|House|Maisonette|Apartment|Property|Terraced House),\s*[^£]{3,100}?\b[A-Z]{1,2}\d{1,2}[A-Z]?)\b",
+            text,
+            re.IGNORECASE,
+        )
+        title = clean_listing_title(title_case_address(title_match.group(1))) if title_match else title_from_result_text("", text)
+        rows.append(
+            {
+                "title": title,
+                "link": link,
+                "snippet": text,
+                "source": "openrent.co.uk",
+                "date": "",
+                "listed_by": "OpenRent",
+            }
+        )
+    return rows
+
+
+def openrent_curl_search_results(station: str, page_index: int) -> list[dict[str, str]]:
+    url = playwright_search_url("openrent.co.uk", station, page_index)
+    if not url:
+        return []
+    markup = openrent_fetch_html(url)
+    if not markup:
+        return []
+    return openrent_results_from_html(markup)
 
 
 def is_blocked_playwright_detail(title: str, text: str) -> bool:
@@ -1996,6 +2071,12 @@ def scan_rental_listings_playwright(
                                         skipped["portal security retry"] = skipped.get("portal security retry", 0) + 1
                                         page.wait_for_timeout(PLAYWRIGHT_BLOCK_RETRY_PAUSE_MS)
                                         page.reload(wait_until="domcontentloaded", timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
+                                if blocked_search_page and domain == "openrent.co.uk":
+                                    fallback_results = openrent_curl_search_results(station, page_index)
+                                    if fallback_results:
+                                        page_results = fallback_results
+                                        portal_stats[domain]["raw_results"] += len(page_results)
+                                        blocked_search_page = False
                                 if blocked_search_page:
                                     skipped["portal security blocked"] = skipped.get("portal security blocked", 0) + 1
                                     samples = skipped_samples.setdefault("portal security blocked", [])
