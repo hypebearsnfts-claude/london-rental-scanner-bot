@@ -53,6 +53,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          OPENRENT_PROXY: ${{ secrets.OPENRENT_PROXY }}
+          PROXY_URL: ${{ secrets.PROXY_URL }}
           SCAN_BACKEND: playwright
           PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION: 12
           SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT: 150

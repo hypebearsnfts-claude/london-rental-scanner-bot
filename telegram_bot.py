@@ -68,6 +68,10 @@ PLAYWRIGHT_DETAIL_PAUSE_MIN_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_PAUSE_MIN
 PLAYWRIGHT_DETAIL_PAUSE_MAX_MS = int(os.environ.get("PLAYWRIGHT_DETAIL_PAUSE_MAX_MS", "3200"))
 PLAYWRIGHT_BLOCK_RETRY_PAUSE_MS = int(os.environ.get("PLAYWRIGHT_BLOCK_RETRY_PAUSE_MS", "15000"))
 PLAYWRIGHT_SEARCH_RETRIES = int(os.environ.get("PLAYWRIGHT_SEARCH_RETRIES", "1"))
+REQUIRE_DETAIL_VERIFICATION_FOR_SEND = os.environ.get(
+    "REQUIRE_DETAIL_VERIFICATION_FOR_SEND",
+    "true",
+).strip().lower() not in {"0", "false", "no", "off"}
 REQUIRE_LIVE_DETAIL_VERIFICATION = True
 MAX_WALKING_MINUTES = 8
 USE_GOOGLE_MAPS_WALKING_FILTER = False
@@ -198,7 +202,18 @@ RIGHTMOVE_LOCATION_IDS = {
     "Regent Park": "STATION^7658",
 }
 
-RIGHTMOVE_STATION_ID_GAPS = set()
+RIGHTMOVE_STATION_ID_GAPS = {
+    # These Rightmove station identifiers currently redirect to /page-not-found.
+    # Keep them out of the daily scrape until the current Rightmove IDs are known;
+    # Zoopla/OTM still cover these watched stations.
+    "Kensington Olympia",
+    "Holborn",
+    "Chancery Lane",
+    "Farringdon",
+    "Angel",
+    "Old Street",
+    "Charing Cross",
+}
 
 STATION_SLUGS = {
     "Covent Garden": "covent-garden",
@@ -1466,6 +1481,8 @@ def portal_location_slug(station: str) -> str:
 def playwright_search_url(domain: str, station: str, page_index: int) -> str | None:
     slug = portal_location_slug(station)
     if domain == "rightmove.co.uk":
+        if station in RIGHTMOVE_STATION_ID_GAPS:
+            return None
         loc_id = RIGHTMOVE_LOCATION_IDS.get(station)
         if not loc_id:
             return None
@@ -1754,6 +1771,8 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
 
 
 def openrent_fetch_html(url: str) -> str | None:
+    proxy = os.environ.get("OPENRENT_PROXY", "").strip() or os.environ.get("PROXY_URL", "").strip()
+    proxies = {"http": proxy, "https": proxy} if proxy else None
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -1765,11 +1784,23 @@ def openrent_fetch_html(url: str) -> str | None:
     try:
         from curl_cffi import requests as creq
 
-        response = creq.get(url, headers=headers, impersonate="chrome124", timeout=30)
-        if response.status_code == 200 and "/property-to-rent/london/" in response.text:
-            return response.text
-    except Exception:
-        pass
+        for impersonate in ["chrome124", "chrome120", "chrome110", "safari17_0"]:
+            try:
+                response = creq.get(url, headers=headers, impersonate=impersonate, proxies=proxies, timeout=30)
+            except Exception as error:
+                log_event(f"openrent_curl_error impersonate={impersonate} error={type(error).__name__}")
+                continue
+            has_listing_links = "/property-to-rent/london/" in response.text
+            is_human_check = "human verification" in response.text.lower() or "confirm you are human" in response.text.lower()
+            log_event(
+                "openrent_curl_fetch "
+                f"impersonate={impersonate} status={response.status_code} "
+                f"bytes={len(response.text or '')} has_links={has_listing_links} human_check={is_human_check}"
+            )
+            if response.status_code == 200 and has_listing_links and not is_human_check:
+                return response.text
+    except Exception as error:
+        log_event(f"openrent_curl_import_or_fetch_error error={type(error).__name__}")
     return None
 
 
@@ -1821,8 +1852,11 @@ def openrent_curl_search_results(station: str, page_index: int) -> list[dict[str
         return []
     markup = openrent_fetch_html(url)
     if not markup:
+        log_event(f"openrent_curl_no_html station={station} page={page_index}")
         return []
-    return openrent_results_from_html(markup)
+    rows = openrent_results_from_html(markup)
+    log_event(f"openrent_curl_results station={station} page={page_index} rows={len(rows)}")
+    return rows
 
 
 def is_blocked_playwright_detail(title: str, text: str) -> bool:
@@ -1992,6 +2026,7 @@ def scan_rental_listings_playwright(
     sent_property_keys = set(state.get("sent_property_keys", []))
     matches: list[dict[str, Any]] = []
     seen_this_scan: set[str] = set()
+    checked_this_scan: set[str] = set()
     seen_fingerprints_this_scan: set[str] = set()
     seen_property_keys_this_scan: set[str] = set()
     skipped: dict[str, int] = {}
@@ -2000,7 +2035,15 @@ def scan_rental_listings_playwright(
     scan_stations = stations or WATCH_STATIONS
     scan_domains = domains or list(WATCH_PORTALS.keys())
     portal_stats: dict[str, dict[str, int]] = {
-        domain: {"pages": 0, "raw_results": 0, "detail_links": 0, "sent": 0}
+        domain: {
+            "pages": 0,
+            "raw_results": 0,
+            "detail_links": 0,
+            "verified_detail_links": 0,
+            "blocked_pages": 0,
+            "search_errors": 0,
+            "sent": 0,
+        }
         for domain in scan_domains
     }
     blocked_domains: set[str] = set()
@@ -2045,7 +2088,18 @@ def scan_rental_listings_playwright(
                                 samples.append(station)
                             break
                         pages_checked += 1
-                        portal_stats.setdefault(domain, {"pages": 0, "raw_results": 0, "detail_links": 0, "sent": 0})
+                        portal_stats.setdefault(
+                            domain,
+                            {
+                                "pages": 0,
+                                "raw_results": 0,
+                                "detail_links": 0,
+                                "verified_detail_links": 0,
+                                "blocked_pages": 0,
+                                "search_errors": 0,
+                                "sent": 0,
+                            },
+                        )
                         portal_stats[domain]["pages"] += 1
                         context = playwright_new_context(browser)
                         page = context.new_page()
@@ -2079,6 +2133,7 @@ def scan_rental_listings_playwright(
                                         blocked_search_page = False
                                 if blocked_search_page:
                                     skipped["portal security blocked"] = skipped.get("portal security blocked", 0) + 1
+                                    portal_stats[domain]["blocked_pages"] += 1
                                     samples = skipped_samples.setdefault("portal security blocked", [])
                                     if len(samples) < 8:
                                         samples.append(playwright_search_diagnostic(page, url))
@@ -2088,6 +2143,7 @@ def scan_rental_listings_playwright(
                             except Exception as error:
                                 key = f"playwright search error: {station} {domain}: {type(error).__name__}"
                                 skipped[key] = skipped.get(key, 0) + 1
+                                portal_stats[domain]["search_errors"] += 1
                                 break
 
                             new_detail_links = []
@@ -2187,6 +2243,7 @@ def scan_rental_listings_playwright(
                                         detail_title, detail_text = playwright_page_text(context, link)
                                         detail_checked = True
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
+                                            portal_stats[domain]["verified_detail_links"] += 1
                                             detail_agency = extract_listing_agency_from_text(detail_text, portal_name)
                                             if detail_agency and is_generic_listing_agency(listed_by, portal_name):
                                                 listed_by = detail_agency
@@ -2253,6 +2310,7 @@ def scan_rental_listings_playwright(
                                         detail_title, detail_text = playwright_page_text(context, link)
                                         detail_checked = True
                                         if not is_blocked_playwright_detail(detail_title, detail_text):
+                                            portal_stats[domain]["verified_detail_links"] += 1
                                             detail_agency = extract_listing_agency_from_text(detail_text, portal_name)
                                             if detail_agency and is_generic_listing_agency(listed_by, portal_name):
                                                 listed_by = detail_agency
@@ -2291,6 +2349,8 @@ def scan_rental_listings_playwright(
                                     samples = skipped_samples.setdefault("detail blacklist verification unavailable", [])
                                     if len(samples) < 8:
                                         samples.append(link)
+                                    if REQUIRE_DETAIL_VERIFICATION_FOR_SEND:
+                                        continue
 
                                 if (fingerprint_keys & seen_fingerprints_this_scan) or (property_key and property_key in seen_property_keys_this_scan):
                                     skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
@@ -2349,7 +2409,6 @@ def scan_rental_listings_playwright(
                                         "fmv": fmv,
                                     }
                                 )
-                                portal_stats[domain]["sent"] += 1
                             page_index += 1
                         finally:
                             context.close()
@@ -2362,14 +2421,21 @@ def scan_rental_listings_playwright(
         finally:
             browser.close()
 
-    if seen_this_scan and not include_seen:
+    if checked_this_scan and not include_seen:
         state = load_scanner_state()
         remembered_checked_urls = set(state.get("checked_urls", []))
-        remembered_checked_urls.update(seen_this_scan)
+        remembered_checked_urls.update(checked_this_scan)
         state["checked_urls"] = sorted(remembered_checked_urls)
         save_scanner_state(state)
 
     matches = dedupe_scanner_matches(matches)
+    for rec in portal_stats.values():
+        rec["sent"] = 0
+    portal_domains_by_name = {name: domain for domain, name in WATCH_PORTALS.items()}
+    for item in matches:
+        domain = portal_domains_by_name.get(item.get("portal", ""))
+        if domain in portal_stats:
+            portal_stats[domain]["sent"] += 1
     matches.sort(key=lambda item: (item["rent"], item["beds"], item["station"]))
     return matches, {
         "skipped": skipped,
@@ -2702,15 +2768,54 @@ def format_skip_summary(meta: dict[str, Any]) -> str:
     return ", ".join(parts) if parts else "No matching live listings after filtering."
 
 
+def format_portal_health(meta: dict[str, Any]) -> str:
+    stats = meta.get("portal_stats", {}) or {}
+    if not stats:
+        return ""
+
+    parts: list[str] = []
+    for domain, label in WATCH_PORTALS.items():
+        rec = stats.get(domain, {}) or {}
+        pages = int(rec.get("pages", 0) or 0)
+        raw = int(rec.get("raw_results", 0) or 0)
+        details = int(rec.get("detail_links", 0) or 0)
+        verified = int(rec.get("verified_detail_links", 0) or 0)
+        blocked = int(rec.get("blocked_pages", 0) or 0)
+        errors = int(rec.get("search_errors", 0) or 0)
+        sent = int(rec.get("sent", 0) or 0)
+        status = "ok"
+        if blocked or errors:
+            status = "blocked/errors"
+        elif pages == 0:
+            status = "skipped"
+        elif raw == 0 or details == 0:
+            status = "no results"
+        elif sent == 0:
+            status = "0 sent"
+        parts.append(
+            f"{label}: {status}, pages {pages}, raw {raw}, details {details}, "
+            f"verified {verified}, sent {sent}"
+        )
+
+    gaps = meta.get("rightmove_station_id_gaps") or []
+    if gaps:
+        parts.append("Rightmove station gaps: " + ", ".join(gaps))
+    return "\n".join(parts)
+
+
 def format_scan_summary(matches: list[dict[str, Any]], meta: dict[str, Any]) -> str:
     provider = meta.get("search_provider", "search API")
     queries = meta.get("queries", 0)
+    portal_health = format_portal_health(meta)
     if matches:
-        return (
+        message = (
             f"Found {len(matches)} new matching live listing(s). "
             f"Checked {meta.get('queried_stations', 0)} stations across {queries} {provider} searches. "
             "Sending all of them now."
         )
+        if portal_health:
+            message += "\n\nPortal health:\n" + html.escape(portal_health)
+        return message
     if is_search_outage(meta):
         return (
             f"Scan could not search properly today. {provider} returned errors for all {queries} searches, "
@@ -2721,11 +2826,14 @@ def format_scan_summary(matches: list[dict[str, Any]], meta: dict[str, Any]) -> 
             f"Scan stopped early because {provider} returned repeated errors. "
             "I did not keep hammering the API. Please check the search API quota/key."
         )
-    return (
+    message = (
         f"No new matching live listings found. Checked {meta.get('queried_stations', 0)} stations "
         f"across {queries} {provider} searches. "
         f"Summary: {html.escape(format_skip_summary(meta))}"
     )
+    if portal_health:
+        message += "\n\nPortal health:\n" + html.escape(portal_health)
+    return message
 
 
 def build_research_queries(subject: dict[str, Any]) -> list[tuple[str, str]]:
