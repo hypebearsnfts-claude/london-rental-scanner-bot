@@ -215,6 +215,18 @@ RIGHTMOVE_STATION_ID_GAPS = {
     "Charing Cross",
 }
 
+RIGHTMOVE_SLUG_FALLBACKS = {
+    # Current Rightmove station URLs that still render listings when the old
+    # find.html locationIdentifier redirects to /page-not-found.
+    "Kensington Olympia": "kensington-olympia",
+    "Holborn": "holborn",
+    "Chancery Lane": "chancery-lane",
+    "Farringdon": "farringdon",
+    "Angel": "angel",
+    "Old Street": "old-street",
+    "Charing Cross": "charing-cross",
+}
+
 STATION_SLUGS = {
     "Covent Garden": "covent-garden",
     "Soho": "piccadilly-circus",
@@ -1481,8 +1493,19 @@ def portal_location_slug(station: str) -> str:
 def playwright_search_url(domain: str, station: str, page_index: int) -> str | None:
     slug = portal_location_slug(station)
     if domain == "rightmove.co.uk":
-        if station in RIGHTMOVE_STATION_ID_GAPS:
-            return None
+        fallback_slug = RIGHTMOVE_SLUG_FALLBACKS.get(station)
+        if fallback_slug:
+            return add_query_params(
+                f"https://www.rightmove.co.uk/property-to-rent/{fallback_slug}.html",
+                minBedrooms=2,
+                maxBedrooms=8,
+                maxPrice=14000,
+                includeLetAgreed="false",
+                furnishTypes="furnished",
+                dontShow="houseShare,student,retirement",
+                sortType=6,
+                index=page_index * 24,
+            )
         loc_id = RIGHTMOVE_LOCATION_IDS.get(station)
         if not loc_id:
             return None
@@ -1859,6 +1882,51 @@ def openrent_curl_search_results(station: str, page_index: int) -> list[dict[str
     return rows
 
 
+def search_api_portal_results(domain: str, station: str, page_index: int) -> tuple[list[dict[str, str]], str]:
+    provider, api_key = scanner_search_credentials()
+    if not provider or not api_key:
+        return [], ""
+    limit = 20 if provider == "brave" else min(20, SCAN_RESULTS_PER_PORTAL_STATION)
+    start = page_index if provider == "brave" else page_index * limit
+    try:
+        rows = scanner_search(
+            station_query(station, domain),
+            api_key,
+            provider,
+            limit=limit,
+            start=start,
+        )
+    except Exception as error:
+        log_event(
+            f"search_api_fallback_error station={station} portal={domain} "
+            f"provider={provider} error={type(error).__name__}"
+        )
+        return [], provider
+
+    cleaned: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for row in rows:
+        link = canonical_listing_url(row.get("link", ""))
+        if not link or link in seen or not is_detail_listing_url(link):
+            continue
+        seen.add(link)
+        cleaned.append(
+            {
+                "title": row.get("title", ""),
+                "link": link,
+                "snippet": row.get("snippet", ""),
+                "source": domain,
+                "date": row.get("age", ""),
+                "listed_by": "",
+            }
+        )
+    log_event(
+        f"search_api_fallback_results station={station} portal={domain} "
+        f"provider={provider} rows={len(cleaned)}"
+    )
+    return cleaned, provider
+
+
 def is_blocked_playwright_detail(title: str, text: str) -> bool:
     lowered = f"{title} {text}".lower()
     return any(
@@ -2042,6 +2110,7 @@ def scan_rental_listings_playwright(
             "verified_detail_links": 0,
             "blocked_pages": 0,
             "search_errors": 0,
+            "api_fallback_results": 0,
             "sent": 0,
         }
         for domain in scan_domains
@@ -2097,6 +2166,7 @@ def scan_rental_listings_playwright(
                                 "verified_detail_links": 0,
                                 "blocked_pages": 0,
                                 "search_errors": 0,
+                                "api_fallback_results": 0,
                                 "sent": 0,
                             },
                         )
@@ -2132,6 +2202,16 @@ def scan_rental_listings_playwright(
                                         portal_stats[domain]["raw_results"] += len(page_results)
                                         blocked_search_page = False
                                 if blocked_search_page:
+                                    fallback_results, fallback_provider = search_api_portal_results(domain, station, page_index)
+                                    if fallback_results:
+                                        page_results = fallback_results
+                                        portal_stats[domain]["raw_results"] += len(page_results)
+                                        portal_stats[domain]["api_fallback_results"] += len(page_results)
+                                        blocked_search_page = False
+                                        skipped[f"{fallback_provider} fallback after portal block"] = (
+                                            skipped.get(f"{fallback_provider} fallback after portal block", 0) + 1
+                                        )
+                                if blocked_search_page:
                                     skipped["portal security blocked"] = skipped.get("portal security blocked", 0) + 1
                                     portal_stats[domain]["blocked_pages"] += 1
                                     samples = skipped_samples.setdefault("portal security blocked", [])
@@ -2158,13 +2238,32 @@ def scan_rental_listings_playwright(
                                 new_detail_links.append(result)
 
                             if not new_detail_links:
-                                reason = "end of search results" if page_index > 0 else "no detail links on search page"
-                                skipped[reason] = skipped.get(reason, 0) + 1
-                                if page_index == 0:
-                                    samples = skipped_samples.setdefault("no detail links on search page", [])
-                                    if len(samples) < 8:
-                                        samples.append(playwright_search_diagnostic(page, url))
-                                break
+                                fallback_results, fallback_provider = search_api_portal_results(domain, station, page_index)
+                                if fallback_results:
+                                    page_results = fallback_results
+                                    portal_stats[domain]["raw_results"] += len(page_results)
+                                    portal_stats[domain]["api_fallback_results"] += len(page_results)
+                                    new_detail_links = []
+                                    for result in page_results:
+                                        link = canonical_listing_url(result.get("link", ""))
+                                        if not is_detail_listing_url(link):
+                                            continue
+                                        if link in seen_page_links:
+                                            continue
+                                        seen_page_links.add(link)
+                                        result["link"] = link
+                                        new_detail_links.append(result)
+                                    skipped[f"{fallback_provider} fallback after empty portal page"] = (
+                                        skipped.get(f"{fallback_provider} fallback after empty portal page", 0) + 1
+                                    )
+                                if not new_detail_links:
+                                    reason = "end of search results" if page_index > 0 else "no detail links on search page"
+                                    skipped[reason] = skipped.get(reason, 0) + 1
+                                    if page_index == 0:
+                                        samples = skipped_samples.setdefault("no detail links on search page", [])
+                                        if len(samples) < 8:
+                                            samples.append(playwright_search_diagnostic(page, url))
+                                    break
                             portal_stats[domain]["detail_links"] += len(new_detail_links)
 
                             if not include_seen and PLAYWRIGHT_STOP_AFTER_STALE_PAGES > 0:
@@ -2351,6 +2450,8 @@ def scan_rental_listings_playwright(
                                         samples.append(link)
                                     if REQUIRE_DETAIL_VERIFICATION_FOR_SEND:
                                         continue
+                                else:
+                                    checked_this_scan.add(canonical)
 
                                 if (fingerprint_keys & seen_fingerprints_this_scan) or (property_key and property_key in seen_property_keys_this_scan):
                                     skipped["duplicate property in scan"] = skipped.get("duplicate property in scan", 0) + 1
@@ -2441,7 +2542,7 @@ def scan_rental_listings_playwright(
         "skipped": skipped,
         "skipped_samples": skipped_samples,
         "portal_stats": portal_stats,
-        "rightmove_station_id_gaps": sorted(station for station in scan_stations if station in RIGHTMOVE_STATION_ID_GAPS),
+        "rightmove_slug_fallbacks": sorted(station for station in scan_stations if station in RIGHTMOVE_SLUG_FALLBACKS),
         "queried_stations": len(scan_stations),
         "queries": pages_checked,
         "detail_pages_checked": detail_pages_checked,
@@ -2782,6 +2883,7 @@ def format_portal_health(meta: dict[str, Any]) -> str:
         verified = int(rec.get("verified_detail_links", 0) or 0)
         blocked = int(rec.get("blocked_pages", 0) or 0)
         errors = int(rec.get("search_errors", 0) or 0)
+        fallback = int(rec.get("api_fallback_results", 0) or 0)
         sent = int(rec.get("sent", 0) or 0)
         status = "ok"
         if blocked or errors:
@@ -2794,12 +2896,12 @@ def format_portal_health(meta: dict[str, Any]) -> str:
             status = "0 sent"
         parts.append(
             f"{label}: {status}, pages {pages}, raw {raw}, details {details}, "
-            f"verified {verified}, sent {sent}"
+            f"verified {verified}, fallback {fallback}, sent {sent}"
         )
 
-    gaps = meta.get("rightmove_station_id_gaps") or []
-    if gaps:
-        parts.append("Rightmove station gaps: " + ", ".join(gaps))
+    fallbacks = meta.get("rightmove_slug_fallbacks") or []
+    if fallbacks:
+        parts.append("Rightmove slug fallback: " + ", ".join(fallbacks))
     return "\n".join(parts)
 
 
