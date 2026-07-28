@@ -47,9 +47,8 @@ SCANNER_DETAIL_BLACKLIST_CHECK_LIMIT = int(os.environ.get("SCANNER_DETAIL_BLACKL
 SCAN_RESULTS_PER_PORTAL_STATION = 100
 SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
-TWO_BED_MAX_RENT = 5500
-THREE_BED_MAX_RENT = 13000
-LARGE_BED_MAX_RENT = 14000
+SCANNER_MIN_BEDROOMS = 2
+SCANNER_MAX_RENT = 12500
 FMV_AIRDNA_MAX_RENT = 7500
 OLD_FMV_MAX_ABOVE_MARKET = 500
 AIRDNA_STR_MAX_ABOVE_ADR = int(os.environ.get("AIRDNA_STR_MAX_ABOVE_ADR", "50"))
@@ -86,7 +85,7 @@ MONEY_RE = re.compile(
 )
 SQFT_RE = re.compile(r"\b([0-9]{3,4})\s*(?:sq\.?\s*ft|sqft|square feet)\b", re.IGNORECASE)
 SQFT_REVERSED_RE = re.compile(r"\b(?:sq\.?\s*ft|sqft|square feet)\s*:?\s*([0-9]{3,4})\b", re.IGNORECASE)
-BED_RE = re.compile(r"\b([1-8])\s*(?:bed|beds|bedroom|bedrooms|br)\b", re.IGNORECASE)
+BED_RE = re.compile(r"\b([1-9]|[1-9][0-9])\s*(?:bed|beds|bedroom|bedrooms|br)\b", re.IGNORECASE)
 _AIRDNA_RATES_CACHE: dict[str, Any] | None = None
 
 WATCH_STATIONS = [
@@ -835,7 +834,7 @@ def title_from_result_text(title: str, snippet: str) -> str:
         return title
 
     openrent_match = re.search(
-        r"\b([2-8]\s+Bed\s+(?:Flat|House|Maisonette|Apartment|Property),\s*[^£]{3,80}?\b[A-Z]{1,2}\d{1,2}[A-Z]?)\b",
+        r"\b((?:[2-9]|[1-9][0-9])\s+Bed\s+(?:Flat|House|Maisonette|Apartment|Property),\s*[^£]{3,80}?\b[A-Z]{1,2}\d{1,2}[A-Z]?)\b",
         snippet,
         re.IGNORECASE,
     )
@@ -850,7 +849,7 @@ def title_from_result_text(title: str, snippet: str) -> str:
         return clean_listing_title(address_matches[-1])
 
     rightmove_match = re.search(
-        r"\b(?:Flat|Apartment|House|Maisonette|Property)\s*,?\s+([^£]{4,90}?(?:London|[A-Z]{1,2}\d{1,2}[A-Z]?))\s+(?:Flat|Apartment|House|Maisonette|Property|[2-8]\b)",
+        r"\b(?:Flat|Apartment|House|Maisonette|Property)\s*,?\s+([^£]{4,90}?(?:London|[A-Z]{1,2}\d{1,2}[A-Z]?))\s+(?:Flat|Apartment|House|Maisonette|Property|\d{1,2}\b)",
         snippet,
         re.IGNORECASE,
     )
@@ -928,6 +927,18 @@ def scanner_blacklist_hit(text: str) -> bool:
         elif normalized_term in normalized:
             return True
     return any(pattern.search(text) for pattern in SCANNER_BLACKLISTED_PATTERNS)
+
+
+def scanner_excluded_property_type(title: str, snippet: str) -> bool:
+    text = compact_text(f"{title} {snippet}", 1800)
+    patterns = [
+        r"\b\d{1,2}\s*(?:bed|beds|bedroom|bedrooms|br)\s+(?:flat|apartment|studio|penthouse)\b",
+        r"\b(?:flat|apartment|studio|penthouse)\s+(?:to rent|for rent|in|on|at|,|\||-)\b",
+        r"\b(?:flat|apartment|studio|penthouse)\s*,\s*[^,]{2,80}\s+to rent\b",
+        r"\bproperty\s+type\s*:?\s*(?:flat|apartment|studio|penthouse)\b",
+        r"\b(?:apartment|flat)\s+in\s+(?:a\s+)?(?:purpose-built|period|georgian|victorian|portered|modern)\b",
+    ]
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
 
 
 def furnishing_status(text: str) -> str | None:
@@ -1296,7 +1307,7 @@ def extract_bedrooms(text: str) -> int | None:
     if match:
         return int(match.group(1))
     card_match = re.search(
-        r"\b(?:to rent|flat|apartment|house|maisonette|property|bungalow|terraced|detached|semi-detached|penthouse|duplex)\s+([1-8])\s+[1-9]\b",
+        r"\b(?:to rent|flat|apartment|house|maisonette|property|bungalow|terraced|detached|semi-detached|penthouse|duplex)\s+([1-9]|[1-9][0-9])\s+[1-9]\b",
         text,
         re.IGNORECASE,
     )
@@ -1310,7 +1321,7 @@ def extract_listing_address(title: str, snippet: str) -> str:
     patterns = [
         r"\b(?:in|at)\s+(.+?)\s+for\s+£",
         r"\b(?:in|at)\s+(.+?)\s+(?:to rent|available|£)",
-        r"^(.+?)\s+(?:\||-|,)?\s*(?:2|3|4|5|6|7|8)\s*(?:bed|bedroom)",
+        r"^(.+?)\s+(?:\||-|,)?\s*\d{1,2}\s*(?:bed|bedroom)",
     ]
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
@@ -1442,11 +1453,10 @@ def passes_scanner_filters(
     if rent is None:
         return False, "rent not visible", beds, None
 
-    if beds == 2 and rent <= TWO_BED_MAX_RENT:
-        return True, "", beds, rent
-    if beds == 3 and rent <= THREE_BED_MAX_RENT:
-        return True, "", beds, rent
-    if 4 <= beds <= 8 and rent <= LARGE_BED_MAX_RENT:
+    if scanner_excluded_property_type(title, snippet):
+        return False, "flat/apartment excluded", beds, rent
+
+    if beds >= SCANNER_MIN_BEDROOMS and rent <= SCANNER_MAX_RENT:
         return True, "", beds, rent
     return False, "outside rent/bed filters", beds, rent
 
@@ -1472,8 +1482,8 @@ def station_query(station: str, domain: str | None = None) -> str:
     return (
         f"({portal_clause}) "
         f"({station_clause}) "
-        '("2 bedroom" OR "3 bedroom" OR "4 bedroom" OR "5 bedroom" OR "6 bedroom" OR "7 bedroom" OR "8 bedroom") '
-        '"to rent" furnished "pcm" London ("near" OR "station" OR "underground" OR "tube") -concierge -"let agreed" -"short let"'
+        '("2 bedroom" OR "3 bedroom" OR "4 bedroom" OR "5 bedroom" OR "6 bedroom" OR "7 bedroom" OR "8 bedroom" OR "9 bedroom" OR "10 bedroom" OR "11 bedroom" OR "12 bedroom") '
+        '"to rent" furnished "pcm" London ("house" OR "maisonette" OR "terraced" OR "detached" OR "semi-detached" OR "property") ("near" OR "station" OR "underground" OR "tube") -flat -apartment -studio -penthouse -concierge -"let agreed" -"short let"'
     )
 
 
@@ -1498,8 +1508,7 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             return add_query_params(
                 f"https://www.rightmove.co.uk/property-to-rent/{fallback_slug}.html",
                 minBedrooms=2,
-                maxBedrooms=8,
-                maxPrice=14000,
+                maxPrice=SCANNER_MAX_RENT,
                 includeLetAgreed="false",
                 furnishTypes="furnished",
                 dontShow="houseShare,student,retirement",
@@ -1516,8 +1525,7 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             locationIdentifier=loc_id,
             radius=radius,
             minBedrooms=2,
-            maxBedrooms=8,
-            maxPrice=14000,
+            maxPrice=SCANNER_MAX_RENT,
             includeLetAgreed="false",
             furnishTypes="furnished",
             dontShow="houseShare,student,retirement",
@@ -1530,8 +1538,7 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
         return add_query_params(
             url,
             beds_min=2,
-            beds_max=8,
-            price_max=14000,
+            price_max=SCANNER_MAX_RENT,
             furnished_state="furnished",
             include_shared_accommodation="false",
             radius="0.5",
@@ -1544,8 +1551,7 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             url,
             **{
                 "min-bedrooms": 2,
-                "max-bedrooms": 8,
-                "max-price": 14000,
+                "max-price": SCANNER_MAX_RENT,
                 "furnishing": "furnished",
                 "include-let-agreed": "false",
                 "radius": "0.5",
@@ -1559,8 +1565,7 @@ def playwright_search_url(domain: str, station: str, page_index: int) -> str | N
             url,
             term=openrent_term,
             bedrooms_min=2,
-            bedrooms_max=8,
-            max_rent=14000,
+            max_rent=SCANNER_MAX_RENT,
             furnishedType=1,
             isLive="true",
             radius="0.5",
@@ -1664,7 +1669,7 @@ def playwright_collect_links(page: Any) -> list[dict[str, str]]:
             for (const card of Array.from(document.querySelectorAll('a.pli[id^="p"]'))) {
               const id = card.id.replace(/^p/, '');
               const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
-              const titleMatch = text.match(/\\d+\\s+Bed\\s+[^,]+,\\s*[^£]+?(?=\\s+(?:We|Available|Beautifully|Marylebone|2 bedrooms|3 bedrooms|4 bedrooms|5 bedrooms|6 bedrooms|7 bedrooms|8 bedrooms|\\d+\\s+Beds|View Details|$))/i);
+              const titleMatch = text.match(/\\d+\\s+Bed\\s+[^,]+,\\s*[^£]+?(?=\\s+(?:We|Available|Beautifully|Marylebone|\\d+ bedrooms|\\d+\\s+Beds|View Details|$))/i);
               const title = (titleMatch ? titleMatch[0] : text.split(' Last updated ')[0] || text).trim();
               rows.push({
                 title: title.slice(0, 180),
@@ -1690,7 +1695,7 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                 if (!text || /let\\s+agreed/i.test(text)) return null;
                 if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
-                if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
+                if (!/(\\b(?:[1-9]|[1-9][0-9])\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex|bungalow|terraced|detached|semi-detached)\\s+(?:[1-9]|[1-9][0-9])\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                 const link = card.querySelector('a[href*="/properties/"]');
                 if (!link) return null;
                 const address = (card.querySelector('address, [class*="Address"], [class*="address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
@@ -1718,7 +1723,7 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 const href = card.href || '';
                 if (!href || href.includes('/new-homes/') || href.includes('/details/contact/') || /let\\s+agreed/i.test(text)) return null;
                 if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
-                if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
+                if (!/(\\b(?:[1-9]|[1-9][0-9])\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex|bungalow|terraced|detached|semi-detached)\\s+(?:[1-9]|[1-9][0-9])\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                 const address = (row.querySelector('[data-testid*="address"], [class*="address"], [class*="Address"]')?.innerText || '').replace(/\\s+/g, ' ').trim();
                 const title = address || row.querySelector('[data-testid*="title"], h2, [class*="title"], [class*="Title"]')?.innerText || text.slice(0, 100);
                 const logoAlt = Array.from(row.querySelectorAll('img[alt]'))
@@ -1743,7 +1748,7 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                 const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                 if (!text || /let\\s+agreed/i.test(text)) return null;
                 if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
-                if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
+                if (!/(\\b(?:[1-9]|[1-9][0-9])\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex|bungalow|terraced|detached|semi-detached)\\s+(?:[1-9]|[1-9][0-9])\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                 const link = Array.from(card.querySelectorAll('a[href*="/details/"]')).find(a => a.href);
                 if (!link) return null;
                 const address = (card.querySelector('address')?.innerText || '').replace(/\\s+/g, ' ').trim();
@@ -1772,7 +1777,7 @@ def playwright_collect_portal_results(page: Any, domain: str) -> list[dict[str, 
                   const text = (card.innerText || '').replace(/\\s+/g, ' ').trim();
                   if (!text || /let\\s+agreed/i.test(text)) return null;
                   if (!/£\\s*[0-9][0-9,]{2,}/.test(text)) return null;
-                  if (!/(\\b[1-8]\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex)\\s+[1-8]\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
+                  if (!/(\\b(?:[1-9]|[1-9][0-9])\\s*(?:bed|beds|bedroom|bedrooms|br)\\b|\\b(?:flat|apartment|house|maisonette|property|penthouse|duplex|bungalow|terraced|detached|semi-detached)\\s+(?:[1-9]|[1-9][0-9])\\s+[1-9]\\b|\\bstudio\\b)/i.test(text)) return null;
                   const kmMatch = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*km\\b/i);
                   const mileMatch = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*miles?\\b/i);
                   let distanceKm = null;
@@ -1851,7 +1856,7 @@ def openrent_results_from_html(markup: str) -> list[dict[str, str]]:
         if beds is None or beds < 2 or rent is None:
             continue
         title_match = re.search(
-            r"\b([2-8]\s+Bed\s+(?:Flat|House|Maisonette|Apartment|Property|Terraced House),\s*[^£]{3,100}?\b[A-Z]{1,2}\d{1,2}[A-Z]?)\b",
+            r"\b((?:[2-9]|[1-9][0-9])\s+Bed\s+(?:Flat|House|Maisonette|Apartment|Property|Terraced House),\s*[^£]{3,100}?\b[A-Z]{1,2}\d{1,2}[A-Z]?)\b",
             text,
             re.IGNORECASE,
         )
@@ -4008,7 +4013,7 @@ class TelegramBot:
                     "Send /scan to look for matching rental listings now.\n"
                     "Send /subscribe to receive daily alerts.\n"
                     "Send /unsubscribe to stop daily alerts.\n\n"
-                    "Filters: 2 beds up to £5,500 pcm; 3 beds up to £13,000 pcm; 4-8 beds up to £14,000 pcm; after hard caps, listings up to £7,500 use AirDNA FMV and listings above £7,500 use the old FMV + £500 rule; near your selected central/west London stations; no concierge; no duplicates."
+                    "Filters: minimum 2 bedrooms; maximum £12,500 pcm; furnished long lets only; houses/maisonettes/property types only, no flats/apartments/studios/penthouses; after hard caps, listings up to £7,500 use AirDNA FMV and listings above £7,500 use the old FMV + £500 rule; near your selected central/west London stations; no concierge; no duplicates."
                 ),
             )
             return

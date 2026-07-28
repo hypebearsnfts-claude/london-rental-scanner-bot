@@ -67,8 +67,9 @@ Telegram commands:
 
 Current filters:
 
-- 2-3 bedrooms below £4,600 pcm.
-- 4-8 bedrooms up to £14,000 pcm.
+- Minimum 2 bedrooms.
+- Maximum £12,500 pcm.
+- Excludes flats, apartments, studios and penthouses; houses, maisonettes and other non-flat property types can pass.
 - Furnished only, where furnishing is visible in the public search result.
 - Excludes visible part-furnished, shared accommodation, house-share, flat-share and student-accommodation results.
 - Long-let style rentals only; excludes visible short-let results.
