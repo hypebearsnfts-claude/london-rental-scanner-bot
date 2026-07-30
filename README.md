@@ -29,7 +29,6 @@ No third-party Python packages are required.
 ```sh
 export TELEGRAM_BOT_TOKEN="paste-your-botfather-token-here"
 export BRAVE_SEARCH_API_KEY="paste-your-brave-search-api-key-here"
-# Or use SERPAPI_KEY instead.
 python3 telegram_bot.py
 ```
 
@@ -46,7 +45,6 @@ Add these repository secrets in GitHub:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `BRAVE_SEARCH_API_KEY`
-- Optional fallback: `SERPAPI_KEY`
 
 The scheduled workflow runs at 11:00 and 12:00 UTC. The Python script checks London local time and only sends the daily scan once after 12:00 London time, including daylight-saving changes. Manual `workflow_dispatch` runs scan immediately.
 
@@ -79,22 +77,22 @@ Current filters:
 - Excludes listings where the visible title/snippet contains `concierge`.
 - Excludes listings where the visible title/snippet contains `let agreed`.
 - Remembers sent listing URLs and same-property fingerprints in `scanner_state.json`, so duplicate cross-posts from different portals are less likely to be resent.
-- Searches each portal separately for each station, keeps paginating until there are no new search results, and sends every new match it finds; there is no artificial send cap. A high safety cap prevents infinite loops if the search API repeats pages. Brave Search uses 20 results per page; SerpApi can request larger pages.
+- Searches each portal separately for each station, keeps paginating until there are no new search results, and sends every new match it finds; there is no artificial send cap. A high safety cap prevents infinite loops if the search provider repeats pages. Brave Search returns up to 20 results per page.
 - Checks the live detail page where possible and skips results that look removed, no longer available, let agreed, now let, or not live.
 
-Limitations: this uses public search plus readable listing pages via SerpApi, so it cannot guarantee every hidden/private listing inside each portal database. Station proximity is based on station-name matching, not exact walking distance. Some portals block detail-page reads; the scanner skips unverified blocked results rather than sending stale listings.
+Limitations: this uses Playwright, public search and readable listing pages via Brave Search when a fallback is needed, so it cannot guarantee every hidden/private listing inside each portal database. Station proximity is based on station-name matching, not exact walking distance. Some portals block detail-page reads; the scanner skips unverified blocked results rather than sending stale listings.
 
 ## Enable deep research mode
 
-The bot cannot use ChatGPT's built-in Deep Research by itself. To research the public web from your own machine, give it a search API key. This version supports SerpApi because it works from a simple Python script without extra packages.
+The bot cannot use ChatGPT's built-in Deep Research by itself. To research the public web from your own machine, give it a Brave Search API key. Playwright remains the primary listing scanner, and Brave Search is used for submitted-link research or as a fallback when a portal page cannot be read.
 
 ```sh
 export TELEGRAM_BOT_TOKEN="paste-your-botfather-token-here"
-export SERPAPI_KEY="paste-your-serpapi-key-here"
+export BRAVE_SEARCH_API_KEY="paste-your-brave-search-api-key-here"
 python3 telegram_bot.py
 ```
 
-With `SERPAPI_KEY` set, each property valuation link triggers the research workflow below silently:
+With `BRAVE_SEARCH_API_KEY` set, each property valuation link triggers the research workflow below silently:
 
 - listing page fetch and metadata extraction where the portal allows it;
 - same-address historical rental searches;
@@ -103,7 +101,7 @@ With `SERPAPI_KEY` set, each property valuation link triggers the research workf
 - wider free-web checks across archive portals, Home.co.uk, ONS and prime-market sources;
 - a short Telegram answer with fair market value, negotiation target and premium/fair-value verdict.
 
-Without `SERPAPI_KEY`, the bot still replies, but it uses the deterministic demo valuation logic and tells you deep research is not enabled.
+Without `BRAVE_SEARCH_API_KEY`, the bot still replies, but it uses the deterministic demo valuation logic and tells you deep research is not enabled.
 
 ## Optional local visual prototype
 

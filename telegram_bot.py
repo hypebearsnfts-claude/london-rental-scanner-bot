@@ -28,7 +28,6 @@ from zoneinfo import ZoneInfo
 
 
 BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN"
-SERPAPI_KEY_ENV = "SERPAPI_KEY"
 BRAVE_SEARCH_API_KEY_ENV = "BRAVE_SEARCH_API_KEY"
 TELEGRAM_CHAT_ID_ENV = "TELEGRAM_CHAT_ID"
 GOOGLE_MAPS_API_KEY_ENV = "GOOGLE_MAPS_API_KEY"
@@ -1066,7 +1065,7 @@ def recover_subject_from_search(url: str, api_key: str, subject: dict[str, Any])
 
     for query in [item for item in queries if item]:
         try:
-            results = serpapi_search(query, api_key, limit=5)
+            results = brave_search(query, api_key, limit=5)
         except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError):
             continue
         recovery_results.extend(results)
@@ -1193,37 +1192,6 @@ def extract_subject_terms(page: dict[str, Any], fallback_url: str) -> dict[str, 
     }
 
 
-def serpapi_search(query: str, api_key: str, limit: int = 5, start: int = 0) -> list[dict[str, str]]:
-    params = urllib.parse.urlencode(
-        {
-            "engine": "google",
-            "q": query,
-            "api_key": api_key,
-            "google_domain": "google.co.uk",
-            "gl": "uk",
-            "hl": "en",
-            "num": limit,
-            "start": start,
-        }
-    )
-    request = urllib.request.Request(f"https://serpapi.com/search.json?{params}")
-    with urllib.request.urlopen(request, timeout=25) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-
-    results = []
-    for item in payload.get("organic_results", [])[:limit]:
-        results.append(
-            {
-                "title": compact_text(item.get("title", ""), 120),
-                "link": item.get("link", ""),
-                "snippet": compact_text(item.get("snippet", ""), 220),
-                "source": item.get("source", ""),
-                "date": item.get("date", ""),
-            }
-        )
-    return results
-
-
 def brave_search(query: str, api_key: str, limit: int = 20, start: int = 0) -> list[dict[str, str]]:
     count = min(max(limit, 1), 20)
     params = urllib.parse.urlencode(
@@ -1262,9 +1230,6 @@ def brave_search(query: str, api_key: str, limit: int = 20, start: int = 0) -> l
 
 
 def scanner_search_credentials() -> tuple[str, str]:
-    serpapi_key = os.environ.get(SERPAPI_KEY_ENV, "").strip()
-    if serpapi_key:
-        return "serpapi", serpapi_key
     brave_key = os.environ.get(BRAVE_SEARCH_API_KEY_ENV, "").strip()
     if brave_key:
         return "brave", brave_key
@@ -1272,9 +1237,9 @@ def scanner_search_credentials() -> tuple[str, str]:
 
 
 def scanner_search(query: str, api_key: str, provider: str, limit: int, start: int) -> list[dict[str, str]]:
-    if provider == "brave":
-        return brave_search(query, api_key, limit=limit, start=start)
-    return serpapi_search(query, api_key, limit=limit, start=start)
+    if provider != "brave":
+        raise RuntimeError("Only Brave Search is configured for API fallback searches")
+    return brave_search(query, api_key, limit=limit, start=start)
 
 
 def portal_from_link(url: str) -> str:
@@ -2557,7 +2522,7 @@ def scan_rental_listings_playwright(
 
 def scan_rental_listings(
     api_key: str,
-    search_provider: str = "serpapi",
+    search_provider: str = "brave",
     include_seen: bool = False,
     stations: list[str] | None = None,
     domains: list[str] | None = None,
@@ -2579,7 +2544,7 @@ def scan_rental_listings(
     query_count = 0
     scan_stations = stations or WATCH_STATIONS
     scan_domains = domains or list(WATCH_PORTALS.keys())
-    provider_page_limit = 20 if search_provider == "brave" else SCAN_RESULTS_PER_PORTAL_STATION
+    provider_page_limit = 20
     per_search = min(results_per_search or provider_page_limit, provider_page_limit)
 
     for station in scan_stations:
@@ -2589,7 +2554,7 @@ def scan_rental_listings(
             page_index = 0
             while page_index < SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION:
                 query_count += 1
-                search_start = page_index if search_provider == "brave" else page_index * per_search
+                search_start = page_index
                 try:
                     page_results = scanner_search(
                         station_query(station, domain),
@@ -2999,7 +2964,7 @@ def collect_deep_research(url: str, api_key: str, user_text: str = "") -> dict[s
 
     for label, query in build_research_queries(subject):
         try:
-            evidence[label] = serpapi_search(query, api_key, limit=4)
+            evidence[label] = brave_search(query, api_key, limit=4)
         except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as error:
             evidence[label] = []
             errors.append(f"{label}: {error}")
@@ -3335,7 +3300,7 @@ def format_deep_research_result(research: dict[str, Any]) -> str:
     comp_stats = comparable_rent_stats(research)
     source_lines = format_source_lines(research)
     if not source_lines:
-        source_lines.append("• No live research results returned. Check SERPAPI_KEY quota or network access.")
+        source_lines.append("• No live research results returned. Check BRAVE_SEARCH_API_KEY quota or network access.")
 
     subject_bits = []
     if subject.get("bedrooms"):
@@ -3550,7 +3515,7 @@ def format_short_fallback_result(url: str, result: dict[str, Any]) -> str:
     if not url_subject.get("address") and provider_from_url(url) in {"Zoopla", "Rightmove", "PrimeLocation"}:
         return (
             f"I could not read this {html.escape(provider_from_url(url))} listing accurately enough to value it.\n\n"
-            f"Please make sure {SERPAPI_KEY_ENV} is set, or paste the rent, address/postcode, bedrooms and sqft from the listing."
+            f"Please make sure {BRAVE_SEARCH_API_KEY_ENV} is set, or paste the rent, address/postcode, bedrooms and sqft from the listing."
         )
 
     subject = clean_subject_name(url_subject.get("address") or listing["address"])
@@ -3572,7 +3537,7 @@ def format_short_fallback_result(url: str, result: dict[str, Any]) -> str:
         f"Status: <b>{html.escape(label)}</b>\n"
         f"Sensible negotiation target: <b>{money(target_low)}-{money(target_high)} pcm</b>\n"
         f"Asking rent: <b>{money(asking)} pcm</b>\n\n"
-        f"<i>Deep research is not enabled in this terminal session. Set {SERPAPI_KEY_ENV} and restart the bot for historical and cross-portal checks.</i>"
+        f"<i>Deep research is not enabled in this terminal session. Set {BRAVE_SEARCH_API_KEY_ENV} and restart the bot for historical and cross-portal checks.</i>"
     )
 
 
@@ -3866,7 +3831,7 @@ class TelegramBot:
         backend = scan_backend()
         search_provider, api_key = scanner_search_credentials()
         if backend != "playwright" and not api_key:
-            message = f"Scanner needs {BRAVE_SEARCH_API_KEY_ENV} or {SERPAPI_KEY_ENV}. Export one in the bot terminal and restart."
+            message = f"Scanner needs {BRAVE_SEARCH_API_KEY_ENV} for API fallback searches. Export it in the bot terminal and restart."
             self.send_message(chat_id, message)
             return {"fatal_error": message}
 
@@ -3940,7 +3905,7 @@ class TelegramBot:
             )
         else:
             if not api_key:
-                self.send_message(chat_id, f"Test scan needs Playwright, {BRAVE_SEARCH_API_KEY_ENV}, or {SERPAPI_KEY_ENV}.")
+                self.send_message(chat_id, f"Test scan needs Playwright or {BRAVE_SEARCH_API_KEY_ENV}.")
                 return
             matches, meta = scan_rental_listings(
                 api_key,
@@ -4082,7 +4047,7 @@ class TelegramBot:
             self.send_message(chat_id, format_override_result(override))
             return
 
-        api_key = os.environ.get(SERPAPI_KEY_ENV, "").strip()
+        api_key = os.environ.get(BRAVE_SEARCH_API_KEY_ENV, "").strip()
         if api_key:
             try:
                 research = collect_deep_research(url, api_key, text)
@@ -4097,8 +4062,8 @@ class TelegramBot:
             return
 
         result = value_listing(url)
-        LAST_DEBUG[chat_id] = f"url={url}\nno_serpapi=true\nfallback_listing={result['listing']}\nband={result['band']}"
-        log_event(f"chat={chat_id} no_serpapi fallback={result['listing']}")
+        LAST_DEBUG[chat_id] = f"url={url}\nno_brave_search=true\nfallback_listing={result['listing']}\nband={result['band']}"
+        log_event(f"chat={chat_id} no_brave_search fallback={result['listing']}")
         self.send_message(chat_id, format_short_fallback_result(url, result))
 
     def run(self) -> None:
