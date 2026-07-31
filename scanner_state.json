@@ -7349,6 +7349,7 @@
     "https://zoopla.co.uk/to-rent/details/73801470",
     "https://zoopla.co.uk/to-rent/details/73801602",
     "https://zoopla.co.uk/to-rent/details/73808679",
+    "https://zoopla.co.uk/to-rent/details/73808798",
     "https://zoopla.co.uk/to-rent/details/73809335",
     "https://zoopla.co.uk/to-rent/details/73811127",
     "https://zoopla.co.uk/to-rent/details/73811435",
@@ -7356,9 +7357,11 @@
     "https://zoopla.co.uk/to-rent/details/73818866",
     "https://zoopla.co.uk/to-rent/details/73825715",
     "https://zoopla.co.uk/to-rent/details/73832331",
-    "https://zoopla.co.uk/to-rent/details/73850668"
+    "https://zoopla.co.uk/to-rent/details/73850668",
+    "https://zoopla.co.uk/to-rent/details/73851683",
+    "https://zoopla.co.uk/to-rent/details/73857944"
   ],
-  "last_scan_date": "2026-07-30",
+  "last_scan_date": "2026-07-31",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|1200|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200",
@@ -12369,6 +12372,8 @@
     "5|6075|queensway-london-tenancy-info-067-pcm-400-queensway-london-apartment-300-floor-areanearest-station-2mi-inverness-bayswater-added",
     "5|6075|regent's park|albany-street-ucl-regents-park-nw1-bed-flat-067-pcm-kaden-just-added-067-pcm-1400-beds-baths",
     "5|6175|regent park|clarence-gardens-euston-nw1-175-pcm-1425-beds-baths-reception-clarence-gardens-euston-nw1-rare-bedroom-house-located",
+    "5|6175|regent's park|clarence-gardens-euston-nw1-bed-terraced-house-175-pcm-oakford-estates-ltd-just-added-175-pcm-1425-beds",
+    "5|6200|clarence-euston-nw1-bed-terraced-house-175-pcm-london",
     "5|6200|clarence-euston-nw1-london",
     "5|6275|albany-street-ucl-regents-park-nw1-283-pcm-1450-beds-baths-albany-street-ucl-regents-park-nw1-special",
     "5|6425|holborn|bed-flat-john-street-ec1v-spacious-five-bedroom-three-bathroom-flat-moments-from-angel-station-available-14th-august",
@@ -12403,6 +12408,8 @@
     "5|8750|strathmore-london",
     "5|8850|baker street|john-wood-nw8-840-pcm-040-john-wood-nw8-apartment-miles-from-station-spacious-five-bedroom-apartment-set",
     "5|8850|john-wood-nw8-london",
+    "5|9000|kendal-bed-995-pcm-london",
+    "5|9000|marble arch|kendal-street-bed-995-pcm-london-broker-995-pcm-2075-beds-baths-reception-2340-kendal-street-tenure-leasehold",
     "5|9325|strathmore-court-park-road-johns-wood-london-nw8-317-pcm-150-strathmore-court-park-road-johns-wood-london",
     "5|9325|strathmore-court-park-road-johns-wood-london-nw8-317-pcm-2150-beds-baths-reception-2545-strathmore-court-park",
     "5|9500|strathmore-court-london-512-pcm-195-strathmore-court-london-flat-miles-from-station-summary-available-added-2026-living",
@@ -14165,6 +14172,7 @@
     "5|5600|west-kensington-5-bed-terraced-house-normand-w14",
     "5|6100|albany-ucl-regents-nw1-5-bed-rent-6",
     "5|6200|clarence-euston-nw1",
+    "5|6200|clarence-euston-nw1-5-bed-terraced-house-rent",
     "5|6400|5-bed-flat-john-ec1v-spacious-five-bedroom",
     "5|6500|rothay-nw1-5-bed-rent-6-500-pcm",
     "5|6700|5-bed-flat-rothay-nw1-rent-now-for",
@@ -14175,6 +14183,7 @@
     "5|8800|john-wood-nw8",
     "5|8800|park-road",
     "5|8800|strathmore-court",
+    "5|9000|kendal-5-bed-property-rent-8-995-pcm",
     "6|10800|southwick-bayswater",
     "6|6000|6-bed-terraced-house-elliot-se11-rent-now",
     "6|6500|6-bed-maisonette-tamworth-sw6-rent-now-for",
@@ -17522,12 +17531,14 @@
     "https://zoopla.co.uk/to-rent/details/73795924",
     "https://zoopla.co.uk/to-rent/details/73800626",
     "https://zoopla.co.uk/to-rent/details/73808679",
+    "https://zoopla.co.uk/to-rent/details/73808798",
     "https://zoopla.co.uk/to-rent/details/73809335",
     "https://zoopla.co.uk/to-rent/details/73811435",
     "https://zoopla.co.uk/to-rent/details/73817702",
     "https://zoopla.co.uk/to-rent/details/73818866",
     "https://zoopla.co.uk/to-rent/details/73832331",
-    "https://zoopla.co.uk/to-rent/details/73850668"
+    "https://zoopla.co.uk/to-rent/details/73850668",
+    "https://zoopla.co.uk/to-rent/details/73857944"
   ],
   "subscribers": [
     1922786763
