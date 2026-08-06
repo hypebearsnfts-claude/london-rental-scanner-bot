@@ -7359,9 +7359,10 @@
     "https://zoopla.co.uk/to-rent/details/73832331",
     "https://zoopla.co.uk/to-rent/details/73850668",
     "https://zoopla.co.uk/to-rent/details/73851683",
-    "https://zoopla.co.uk/to-rent/details/73857944"
+    "https://zoopla.co.uk/to-rent/details/73857944",
+    "https://zoopla.co.uk/to-rent/details/73860771"
   ],
-  "last_scan_date": "2026-08-05",
+  "last_scan_date": "2026-08-06",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|1200|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200",
@@ -10791,6 +10792,7 @@
     "3|3975|regent park|augustus-street-london-nw1-965-pcm-915-beds-bath-augustus-street-london-nw1-special-offer-the-tenant-will",
     "3|4000|addison-road-london-w14-tenancy-info-000-pcm-923-addison-road-london-w14-flat-three-bedroomstwo-bathrooms-marsh",
     "3|4000|albany-london-nw1-bed-flat-000-pcm",
+    "3|4000|angel|lloyd-street-london-wc1x-bed-maisonette-995-pcm-the-chant-group-995-pcm-921-beds-lloyd-street-london",
     "3|4000|ashley-gardens-thirleby-road-london-sw1p-000-pcm-923-beds-baths-reception-1027-ashley-gardens-thirleby-road-london",
     "3|4000|ashley-gardens-thirleby-road-london-sw1p-tenancy-info-000-pcm-923-ashley-gardens-thirleby-road-london-sw1p-apartment",
     "3|4000|ashley-thirleby-london-sw1p",
@@ -10817,6 +10819,7 @@
     "3|4000|latymer-hammersmith-hammersmith-london",
     "3|4000|latymer-hammersmith-london-bed-000-pcm",
     "3|4000|lisson-london-nw1-bed-flat-000-pcm",
+    "3|4000|lloyd-london-wc1x-bed-maisonette-995-pcm",
     "3|4000|london-bed-flat-great-eastern-ec2a-now-for-990",
     "3|4000|london-bed-flat-hawkshead-nw1-now-for-000-share",
     "3|4000|london-bed-flat-prince-wales-passage-nw1-now-for-000-ope",
@@ -13534,6 +13537,7 @@
     "3|4000|latymer-hammersmith-3-bed-property-rent-4-000",
     "3|4000|latymer-hammersmith-hammersmith",
     "3|4000|lisson-nw1-3-bed-rent-4-000-pcm",
+    "3|4000|lloyd-wc1x-3-bed-maisonette-rent-3-995",
     "3|4000|peninsula-paddington",
     "3|4000|phoenix-pancras-nw1-3-bed-rent-3-950",
     "3|4000|shaftesbury-w14-3-bed-rent-3-987-pcm",
@@ -17538,7 +17542,8 @@
     "https://zoopla.co.uk/to-rent/details/73818866",
     "https://zoopla.co.uk/to-rent/details/73832331",
     "https://zoopla.co.uk/to-rent/details/73850668",
-    "https://zoopla.co.uk/to-rent/details/73857944"
+    "https://zoopla.co.uk/to-rent/details/73857944",
+    "https://zoopla.co.uk/to-rent/details/73860771"
   ],
   "subscribers": [
     1922786763
