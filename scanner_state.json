@@ -7365,9 +7365,11 @@
     "https://zoopla.co.uk/to-rent/details/73885331",
     "https://zoopla.co.uk/to-rent/details/73896933",
     "https://zoopla.co.uk/to-rent/details/73920389",
-    "https://zoopla.co.uk/to-rent/details/73944559"
+    "https://zoopla.co.uk/to-rent/details/73944559",
+    "https://zoopla.co.uk/to-rent/details/73964959",
+    "https://zoopla.co.uk/to-rent/details/73975665"
   ],
-  "last_scan_date": "2026-08-13",
+  "last_scan_date": "2026-08-14",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|1200|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200",
@@ -10694,6 +10696,8 @@
     "3|3700|london-bed-flat-westerham-nw1-now-for-700-share",
     "3|3700|marylebone|fisherton-street-marylebone-nw8-bed-flat-700-pcm-sincere-lettings-just-added-700-pcm-853-beds-bath-fisherton",
     "3|3700|regent's park|london-bed-flat-westerham-nw1-now-for-700-share-whatsapp-facebook-email-messenger-gmail-copy-more-options-print",
+    "3|3700|regent's park|stanhope-street-regent-park-nw1-bed-maisonette-699-pcm-ums-london-just-added-699-pcm-853-beds-bath",
+    "3|3700|stanhope-regent-nw1-bed-maisonette-699-pcm-london",
     "3|3700|stanwick-road-london-w14-tenancy-info-700-pcm-854-stanwick-road-london-w14-flat-three-double-bedroomseat-kitchen",
     "3|3700|stanwick-road-west-kensington-w14-700-pcm-853-beds-bath-reception-stanwick-road-west-kensington-w14-hmo-licence",
     "3|3700|warwick-pimlico-london-sw1v-bed-flat-683-pcm",
@@ -12382,6 +12386,8 @@
     "5|5625|kensington olympia|west-kensington-bed-terraced-house-normand-gardens-w14-now-for-635-terraced-house-635-month-bed-terraced-house",
     "5|5650|edith-west-kensington-london-w14-bed-flat-633-pcm",
     "5|5650|west-kensington-bed-terraced-house-normand-w14-now-for-635-london",
+    "5|5850|regent's park|woodhall-robert-street-euston-nw1-bed-maisonette-850-pcm-bentley-just-added-850-pcm-1350-beds-baths-reception",
+    "5|5850|woodhall-robert-euston-nw1-bed-maisonette-850-pcm-london",
     "5|5950|clarence-euston-nw1-bed-terraced-house-958-pcm-london",
     "5|5950|regent's park|clarence-gardens-euston-nw1-bed-terraced-house-958-pcm-oakford-estates-ltd-958-pcm-1375-beds-baths-reception",
     "5|5950|regent's park|robert-street-london-nw1-bed-maisonette-958-pcm-bentley-958-pcm-1375-beds-baths-reception-1256-robert-street",
@@ -13505,6 +13511,7 @@
     "3|3700|great-cumberland-w1h",
     "3|3700|hadstock-house-nw1-3-bed-rent-3-700",
     "3|3700|joanne-house",
+    "3|3700|stanhope-regent-nw1-3-bed-maisonette-rent-3",
     "3|3700|warwick-pimlico-sw1v-3-bed-rent-3-683",
     "3|3700|west-kensington-w14-3-bed-rent-3-700",
     "3|3800|3-bed-flat-newbury-house-rent-now-for",
@@ -14192,6 +14199,7 @@
     "5|5500|chalton-nw1-5-bed-rent-5-500-pcm",
     "5|5600|edith-west-kensington-w14-5-bed-rent-5",
     "5|5600|west-kensington-5-bed-terraced-house-normand-w14",
+    "5|5800|woodhall-robert-euston-nw1-5-bed-maisonette-rent",
     "5|6000|clarence-euston-nw1-5-bed-terraced-house-rent",
     "5|6000|robert-nw1-5-bed-maisonette-rent-5-958",
     "5|6100|albany-ucl-regents-nw1-5-bed-rent-6",
@@ -17568,7 +17576,9 @@
     "https://zoopla.co.uk/to-rent/details/73885331",
     "https://zoopla.co.uk/to-rent/details/73896933",
     "https://zoopla.co.uk/to-rent/details/73920389",
-    "https://zoopla.co.uk/to-rent/details/73944559"
+    "https://zoopla.co.uk/to-rent/details/73944559",
+    "https://zoopla.co.uk/to-rent/details/73964959",
+    "https://zoopla.co.uk/to-rent/details/73975665"
   ],
   "subscribers": [
     1922786763
