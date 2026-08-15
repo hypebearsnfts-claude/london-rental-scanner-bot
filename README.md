@@ -71,7 +71,7 @@ Current filters:
 - Furnished only, where furnishing is visible in the public search result.
 - Excludes visible part-furnished, shared accommodation, house-share, flat-share and student-accommodation results.
 - Long-let style rentals only; excludes visible short-let results.
-- Search focus around Kensington Olympia, Bayswater, Lancaster Gate, Gloucester Road, South Kensington, Marble Arch, Bond Street, Baker Street, Regent Park, Oxford Circus, Tottenham Court Road, Covent Garden, Leicester Square, Piccadilly Circus, Holborn, Charing Cross and Victoria.
+- Searches Kensington Olympia, Bayswater, Lancaster Gate, Gloucester Road, South Kensington, Marble Arch, Bond Street, Baker Street, Regent's Park, Oxford Circus, Tottenham Court Road, Covent Garden, Leicester Square, Piccadilly Circus, Holborn, Charing Cross, Victoria, Soho, Marylebone, Chancery Lane, Farringdon, Angel, Old Street, King's Cross St Pancras, Goodge Street and Russell Square.
 - Includes station-name aliases such as `Kensington (Olympia)`, `Regent's Park` and the common Piccadilly spelling variant.
 - Station-name matching only. The bot searches for listings that mention the watched stations or nearby station context; it does not enforce exact walking distance.
 - Excludes listings where the visible title/snippet contains `concierge`.

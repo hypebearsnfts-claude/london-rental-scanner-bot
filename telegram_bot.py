@@ -37,7 +37,6 @@ OVERRIDES_FILE = "listing_overrides.json"
 LOG_FILE = "bot.log"
 SCANNER_STATE_FILE = "scanner_state.json"
 SCANNER_EXPORT_DIR = "exports"
-AIRDNA_RATES_FILE = "airdna_rates.json"
 LOCAL_TZ = ZoneInfo("Europe/London")
 DAILY_SCAN_HOUR = 12
 SCANNER_LISTINGS_PER_MESSAGE = 6
@@ -48,10 +47,6 @@ SCAN_SAFETY_MAX_PAGES_PER_PORTAL_STATION = 50
 SCAN_MAX_CONSECUTIVE_SEARCH_ERRORS = 8
 SCANNER_MIN_BEDROOMS = 2
 SCANNER_MAX_RENT = 12500
-FMV_AIRDNA_MAX_RENT = 7500
-OLD_FMV_MAX_ABOVE_MARKET = 500
-AIRDNA_STR_MAX_ABOVE_ADR = int(os.environ.get("AIRDNA_STR_MAX_ABOVE_ADR", "50"))
-AIRDNA_FMV_CHECK_ENABLED = os.environ.get("AIRDNA_FMV_CHECK_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
 PLAYWRIGHT_MAX_PAGES_PER_PORTAL_STATION = 50
 PLAYWRIGHT_NAV_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_NAV_TIMEOUT_MS", "12000"))
 PLAYWRIGHT_SEARCH_NETWORKIDLE_TIMEOUT_MS = int(os.environ.get("PLAYWRIGHT_SEARCH_NETWORKIDLE_TIMEOUT_MS", "2500"))
@@ -85,36 +80,40 @@ MONEY_RE = re.compile(
 SQFT_RE = re.compile(r"\b([0-9]{3,4})\s*(?:sq\.?\s*ft|sqft|square feet)\b", re.IGNORECASE)
 SQFT_REVERSED_RE = re.compile(r"\b(?:sq\.?\s*ft|sqft|square feet)\s*:?\s*([0-9]{3,4})\b", re.IGNORECASE)
 BED_RE = re.compile(r"\b([1-9]|[1-9][0-9])\s*(?:bed|beds|bedroom|bedrooms|br)\b", re.IGNORECASE)
-_AIRDNA_RATES_CACHE: dict[str, Any] | None = None
 
 WATCH_STATIONS = [
-    "Covent Garden",
-    "Soho",
-    "Baker Street",
-    "Bond Street",
-    "Marble Arch",
-    "Oxford Circus",
-    "Marylebone",
-    "Regent's Park",
     "Kensington Olympia",
+    "Bayswater",
+    "Lancaster Gate",
+    "Gloucester Road",
+    "South Kensington",
+    "Marble Arch",
+    "Bond Street",
+    "Baker Street",
+    "Regent's Park",
+    "Oxford Circus",
+    "Tottenham Court Road",
+    "Covent Garden",
+    "Leicester Square",
+    "Piccadilly Circus",
     "Holborn",
+    "Charing Cross",
+    "Victoria",
+    "Soho",
+    "Marylebone",
     "Chancery Lane",
     "Farringdon",
     "Angel",
     "Old Street",
-    "Charing Cross",
-    "Victoria",
     "King's Cross St Pancras",
     "Goodge Street",
     "Russell Square",
-    "Gloucester Road",
-    "Lancaster Gate",
 ]
 
 STATION_ALIASES = {
     "Kensington Olympia": ["Kensington Olympia", "Kensington (Olympia)"],
     "Regent's Park": ["Regent's Park", "Regent Park"],
-    "Soho": ["Soho", "Piccadilly Circus"],
+    "Piccadilly Circus": ["Piccadilly Circus", "Picadilly Circus"],
     "King's Cross St Pancras": ["King's Cross St Pancras", "King's Cross", "Kings Cross St Pancras"],
 }
 
@@ -223,11 +222,21 @@ RIGHTMOVE_SLUG_FALLBACKS = {
     "Angel": "angel",
     "Old Street": "old-street",
     "Charing Cross": "charing-cross",
+    "Bayswater": "bayswater",
+    "South Kensington": "south-kensington",
+    "Tottenham Court Road": "tottenham-court-road",
+    "Leicester Square": "leicester-square",
+    "Piccadilly Circus": "piccadilly-circus",
 }
 
 STATION_SLUGS = {
     "Covent Garden": "covent-garden",
     "Soho": "piccadilly-circus",
+    "Bayswater": "bayswater",
+    "South Kensington": "south-kensington",
+    "Tottenham Court Road": "tottenham-court-road",
+    "Leicester Square": "leicester-square",
+    "Piccadilly Circus": "piccadilly-circus",
     "Baker Street": "baker-street",
     "Bond Street": "bond-street",
     "Marble Arch": "marble-arch",
@@ -255,6 +264,11 @@ STATION_SLUGS = {
 OPENRENT_LOCATION_TERMS = {
     "Covent Garden": ("covent-garden-london", "Covent Garden, London"),
     "Soho": ("soho-london", "Soho, London"),
+    "Bayswater": ("bayswater-london", "Bayswater, London"),
+    "South Kensington": ("south-kensington-london", "South Kensington, London"),
+    "Tottenham Court Road": ("tottenham-court-road-london", "Tottenham Court Road, London"),
+    "Leicester Square": ("leicester-square-london", "Leicester Square, London"),
+    "Piccadilly Circus": ("piccadilly-circus-london", "Piccadilly Circus, London"),
     "Baker Street": ("baker-street-london", "Baker Street, London"),
     "Bond Street": ("bond-street-london", "Bond Street, London"),
     "Marble Arch": ("marble-arch-london", "Marble Arch, London"),
@@ -401,146 +415,6 @@ def pick(seed: int, values: list[Any], offset: int = 0) -> Any:
 
 def money(value: float) -> str:
     return f"£{value:,.0f}"
-
-
-def load_airdna_rates() -> dict[str, Any]:
-    global _AIRDNA_RATES_CACHE
-    if _AIRDNA_RATES_CACHE is not None:
-        return _AIRDNA_RATES_CACHE
-    path = os.path.join(os.path.dirname(__file__), AIRDNA_RATES_FILE)
-    try:
-        with open(path, "r", encoding="utf-8") as file:
-            data = json.load(file)
-            _AIRDNA_RATES_CACHE = data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        _AIRDNA_RATES_CACHE = {}
-    return _AIRDNA_RATES_CACHE
-
-
-def airdna_station_candidates(station: str) -> list[str]:
-    candidates = [station]
-    candidates.extend(STATION_ALIASES.get(station, []))
-    if station == "Regent Park":
-        candidates.append("Regent's Park")
-    normalized_seen: set[str] = set()
-    unique: list[str] = []
-    for candidate in candidates:
-        key = re.sub(r"[^a-z0-9]+", "", candidate.lower())
-        if key and key not in normalized_seen:
-            normalized_seen.add(key)
-            unique.append(candidate)
-    return unique
-
-
-def get_airdna_avg(station: str, beds: int) -> int | None:
-    rates = load_airdna_rates()
-    by_station = rates.get("by_station", {})
-    by_bedrooms = rates.get("by_bedrooms", {})
-    beds_key = str(min(max(int(beds), 1), 7))
-
-    if isinstance(by_station, dict):
-        for candidate in airdna_station_candidates(station):
-            station_rates = by_station.get(candidate, {})
-            if isinstance(station_rates, dict) and station_rates.get(beds_key):
-                return int(station_rates[beds_key])
-
-    if isinstance(by_bedrooms, dict) and by_bedrooms.get(beds_key):
-        return int(by_bedrooms[beds_key])
-    return None
-
-
-def airdna_fmv_verdict(station: str, beds: int, rent: int) -> dict[str, Any]:
-    """
-    Copy of the reference bot's AirDNA STR viability gate:
-    required_nightly = asking_pcm * 1.5 / 21
-    pass if required_nightly <= AirDNA ADR + AIRDNA_STR_MAX_ABOVE_ADR.
-    """
-    if not AIRDNA_FMV_CHECK_ENABLED:
-        return {"pass": True, "enabled": False}
-    airdna_avg = get_airdna_avg(station, beds)
-    if not airdna_avg:
-        return {"pass": True, "enabled": True, "airdna_avg": None, "reason": "no AirDNA data"}
-    required_nightly = (rent * 1.5) / 21
-    margin = required_nightly - airdna_avg
-    return {
-        "pass": margin <= AIRDNA_STR_MAX_ABOVE_ADR,
-        "enabled": True,
-        "airdna_avg": airdna_avg,
-        "required_nightly": required_nightly,
-        "margin": margin,
-        "tolerance": AIRDNA_STR_MAX_ABOVE_ADR,
-    }
-
-
-def estimated_sqft_for_beds(beds: int) -> int:
-    return {
-        1: 550,
-        2: 825,
-        3: 1150,
-        4: 1650,
-        5: 2100,
-        6: 2550,
-        7: 3000,
-        8: 3450,
-    }.get(int(beds), 825)
-
-
-def old_fmv_station_psf(station: str) -> int:
-    normalized = re.sub(r"[^a-z0-9]+", " ", station.lower()).strip()
-    annual_psf_by_station = {
-        "kensington olympia": 68,
-        "bayswater": 72,
-        "lancaster gate": 72,
-        "gloucester road": 98,
-        "south kensington": 100,
-        "marble arch": 86,
-        "bond street": 106,
-        "baker street": 82,
-        "regent park": 82,
-        "regents park": 82,
-        "oxford circus": 86,
-        "tottenham court road": 82,
-        "covent garden": 84,
-        "leicester square": 86,
-        "piccadilly circus": 96,
-        "holborn": 78,
-        "charing cross": 86,
-        "victoria": 78,
-    }
-    return annual_psf_by_station.get(normalized, 82)
-
-
-def old_market_fmv_verdict(station: str, beds: int, rent: int, title: str = "", snippet: str = "") -> dict[str, Any]:
-    """
-    Scanner version of the old FMV rule: pass if asking <= FMV + £500.
-    This is intentionally used only for higher-rent listings, after hard caps.
-    """
-    text = f"{title} {snippet}"
-    sqft_matches = [int(match.group(1).replace(",", "")) for match in re.finditer(r"\b([0-9][0-9,]{2,4})\s*(?:sq\.?\s*ft|sqft|square feet)\b", text, re.IGNORECASE)]
-    sqft = next((value for value in sqft_matches if 300 <= value <= 7000), estimated_sqft_for_beds(beds))
-    annual_psf = old_fmv_station_psf(station)
-    fmv = round(((annual_psf * sqft) / 12) / 50) * 50
-    max_acceptable = fmv + OLD_FMV_MAX_ABOVE_MARKET
-    return {
-        "pass": rent <= max_acceptable,
-        "enabled": True,
-        "method": "old_fmv",
-        "fmv": fmv,
-        "max_acceptable": max_acceptable,
-        "asking_over_fmv": rent - fmv,
-        "sqft_used": sqft,
-        "annual_psf_used": annual_psf,
-        "tolerance": OLD_FMV_MAX_ABOVE_MARKET,
-    }
-
-
-def scanner_fmv_verdict(station: str, beds: int, rent: int, title: str = "", snippet: str = "") -> dict[str, Any]:
-    if rent <= FMV_AIRDNA_MAX_RENT:
-        verdict = airdna_fmv_verdict(station, beds, rent)
-        verdict["method"] = "airdna"
-        verdict["threshold"] = FMV_AIRDNA_MAX_RENT
-        return verdict
-    return old_market_fmv_verdict(station, beds, rent, title=title, snippet=snippet)
 
 
 def log_event(message: str) -> None:
@@ -2450,12 +2324,6 @@ def scan_rental_listings_playwright(
                                 else:
                                     closest = {"station": station, "minutes": None}
 
-                                fmv = scanner_fmv_verdict(closest["station"], beds, rent, title=title, snippet=snippet)
-                                if not fmv.get("pass"):
-                                    skip_key = "failed AirDNA FMV check" if fmv.get("method") == "airdna" else "failed old FMV check"
-                                    skipped[skip_key] = skipped.get(skip_key, 0) + 1
-                                    continue
-
                                 matches.append(
                                     {
                                         "title": clean_listing_title(title),
@@ -2476,8 +2344,6 @@ def scan_rental_listings_playwright(
                                         "property_key": property_key,
                                         "detail_checked": detail_checked,
                                         "detail_blocked": detail_blocked,
-                                        "airdna": fmv if fmv.get("method") == "airdna" else {},
-                                        "fmv": fmv,
                                     }
                                 )
                             page_index += 1
@@ -2672,12 +2538,6 @@ def scan_rental_listings(
             else:
                 closest = {"station": station, "minutes": None}
 
-            fmv = scanner_fmv_verdict(closest["station"], beds, rent, title=title, snippet=snippet)
-            if not fmv.get("pass"):
-                skip_key = "failed AirDNA FMV check" if fmv.get("method") == "airdna" else "failed old FMV check"
-                skipped[skip_key] = skipped.get(skip_key, 0) + 1
-                continue
-
             matches.append(
                 {
                     "title": clean_listing_title(title),
@@ -2695,8 +2555,6 @@ def scan_rental_listings(
                     "fingerprint": fingerprint,
                     "legacy_fingerprint": legacy_fingerprint,
                     "property_key": property_key,
-                    "airdna": fmv if fmv.get("method") == "airdna" else {},
-                    "fmv": fmv,
                 }
             )
 
@@ -2716,30 +2574,12 @@ def format_scanner_listing(item: dict[str, Any]) -> str:
         if item.get("walking_minutes") is not None
         else f"station match: {html.escape(item['closest_station'])}"
     )
-    airdna = item.get("airdna") or {}
-    airdna_line = ""
-    if airdna.get("enabled") and airdna.get("airdna_avg"):
-        airdna_line = (
-            f"AirDNA FMV: needs {money(airdna.get('required_nightly', 0))}/night; "
-            f"avg {money(airdna['airdna_avg'])}/night"
-        )
-    fmv = item.get("fmv") or {}
-    fmv_line = ""
-    if fmv.get("method") == "old_fmv" and fmv.get("fmv"):
-        fmv_line = (
-            f"FMV: {money(fmv['fmv'])} pcm; "
-            f"passes up to {money(fmv.get('max_acceptable', fmv['fmv']))}"
-        )
     link = html.escape(item["link"])
     lines = [
         f"<b>{html.escape(item['title'])}</b>",
         f"{item['beds']} bed | {money(item['rent'])} pcm | {html.escape(item['portal'])}",
         station_line,
     ]
-    if airdna_line:
-        lines.append(airdna_line)
-    if fmv_line:
-        lines.append(fmv_line)
     lines.append(link)
     return "\n".join(lines)
 
@@ -2749,24 +2589,11 @@ def format_scanner_listing_batch(items: list[dict[str, Any]]) -> str:
 
 
 def scanner_export_row(item: dict[str, Any], meta: dict[str, Any], chat_id: int) -> dict[str, Any]:
-    airdna = item.get("airdna") or {}
-    nightly_rate_needed = airdna.get("required_nightly", "")
-    if isinstance(nightly_rate_needed, (int, float)):
-        nightly_rate_needed = round(nightly_rate_needed)
-    airdna_adr = airdna.get("airdna_avg", "")
-    if isinstance(airdna_adr, (int, float)):
-        airdna_adr = round(airdna_adr)
-    margin = airdna.get("margin", "")
-    if isinstance(margin, (int, float)):
-        margin = round(margin)
     return {
         "link": item.get("link", ""),
         "listed_by": item.get("listed_by") or item.get("portal", ""),
         "station": item.get("closest_station") or item.get("station", ""),
         "rent": item.get("rent", ""),
-        "nightly_rate_needed": nightly_rate_needed,
-        "airdna_adr": airdna_adr,
-        "margin": margin,
         "beds": item.get("beds", ""),
     }
 
@@ -2781,13 +2608,25 @@ def export_scanner_matches_csv(matches: list[dict[str, Any]], meta: dict[str, An
     fieldnames = list(scanner_export_row(matches[0], meta, chat_id).keys())
 
     existing_keys: set[str] = set()
+    existing_rows: list[dict[str, Any]] = []
+    existing_fieldnames: list[str] = []
     if os.path.exists(path):
         try:
             with open(path, newline="", encoding="utf-8-sig") as existing_file:
-                for row in csv.DictReader(existing_file):
+                reader = csv.DictReader(existing_file)
+                existing_fieldnames = reader.fieldnames or []
+                for row in reader:
+                    existing_rows.append(row)
                     existing_keys.add(row.get("canonical") or row.get("link") or "")
         except (OSError, csv.Error):
             existing_keys = set()
+            existing_rows = []
+
+    if existing_rows and existing_fieldnames != fieldnames:
+        with open(path, "w", newline="", encoding="utf-8-sig") as export_file:
+            writer = csv.DictWriter(export_file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows({key: row.get(key, "") for key in fieldnames} for row in existing_rows)
 
     rows = []
     for item in matches:
@@ -3978,7 +3817,7 @@ class TelegramBot:
                     "Send /scan to look for matching rental listings now.\n"
                     "Send /subscribe to receive daily alerts.\n"
                     "Send /unsubscribe to stop daily alerts.\n\n"
-                    "Filters: minimum 2 bedrooms; maximum £12,500 pcm; furnished long lets only; houses/maisonettes/property types only, no flats/apartments/studios/penthouses; after hard caps, listings up to £7,500 use AirDNA FMV and listings above £7,500 use the old FMV + £500 rule; near your selected central/west London stations; no concierge; no duplicates."
+                    "Filters: minimum 2 bedrooms; maximum £12,500 pcm; furnished long lets only; houses/maisonettes/property types only, no flats/apartments/studios/penthouses; near your selected central/west London stations; no concierge; no duplicates."
                 ),
             )
             return
