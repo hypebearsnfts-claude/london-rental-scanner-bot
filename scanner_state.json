@@ -7382,9 +7382,10 @@
     "https://zoopla.co.uk/to-rent/details/74035968",
     "https://zoopla.co.uk/to-rent/details/74077588",
     "https://zoopla.co.uk/to-rent/details/74175180",
+    "https://zoopla.co.uk/to-rent/details/74259380",
     "https://zoopla.co.uk/to-rent/details/74286339"
   ],
-  "last_scan_date": "2026-09-24",
+  "last_scan_date": "2026-09-25",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|1200|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200",
@@ -11746,6 +11747,8 @@
     "3|8900|prince-wales-kensington-london",
     "3|8900|south kensington|lennox-gardens-knightsbridge-sw1x-tenancy-info-900-pcm-054-lennox-gardens-knightsbridge-sw1x-apartment-elegant-bedroom-split-level",
     "3|8925|gloucester road|prince-wales-terrace-kensington-tenancy-info-920-pcm-058-prince-wales-terrace-kensington-apartment-three-bedroomsthree-bathrooms-benham",
+    "3|8950|gloucester road|queens-gate-mews-south-kensington-sw7-bed-950-pcm-marsh-parsons-south-kensington-950-pcm-2065-beds-baths",
+    "3|8950|queens-gate-south-kensington-sw7-bed-950-pcm-london",
     "3|9000|ennismore-knightsbridge-sw7-london",
     "3|9000|ennismore-london-sw7-bed-flat-000-pcm",
     "3|9000|gloucester road|lexham-gardens-london-000-pcm-2076-beds-baths-lexham-gardens-london-this-furnished-flat-lexham-gardens-london-offers",
@@ -14032,6 +14035,7 @@
     "3|9000|ennismore-knightsbridge-sw7",
     "3|9000|ennismore-sw7-3-bed-rent-9-000-pcm",
     "3|9000|lexham-gardens",
+    "3|9000|queens-gate-south-kensington-sw7-3-bed-property",
     "3|900|3-bed-flat-harbledown-house-se1-rent-now",
     "3|9100|queen-gate-south-kensington-sw7",
     "3|9300|eaton-knightsbridge-sw1x",
@@ -17653,6 +17657,7 @@
     "https://zoopla.co.uk/to-rent/details/74035968",
     "https://zoopla.co.uk/to-rent/details/74077588",
     "https://zoopla.co.uk/to-rent/details/74175180",
+    "https://zoopla.co.uk/to-rent/details/74259380",
     "https://zoopla.co.uk/to-rent/details/74286339"
   ],
   "subscribers": [
