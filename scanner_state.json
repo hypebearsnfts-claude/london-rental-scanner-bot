@@ -7384,11 +7384,16 @@
     "https://zoopla.co.uk/to-rent/details/74077588",
     "https://zoopla.co.uk/to-rent/details/74175180",
     "https://zoopla.co.uk/to-rent/details/74259380",
-    "https://zoopla.co.uk/to-rent/details/74286339"
+    "https://zoopla.co.uk/to-rent/details/74286339",
+    "https://zoopla.co.uk/to-rent/details/74319074",
+    "https://zoopla.co.uk/to-rent/details/74325259",
+    "https://zoopla.co.uk/to-rent/details/74342211"
   ],
-  "last_scan_date": "2026-09-28",
+  "last_scan_date": "2026-09-29",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
+    "2|10500|gloucester road|queensbury-mews-west-south-kensington-sw7-bed-mews-500-pcm-russell-simpson-500-pcm-2423-beds-baths-953",
+    "2|10500|queensbury-west-south-kensington-sw7-bed-500-pcm-london",
     "2|1200|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200",
     "2|1200|regent's park|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200-share-whatsapp-facebook-email-messenger-gmail-copy",
     "2|1400|bayswater|queensway-london-400-pcm-323-beds-bath-reception-620-queensway-london-this-being-marketed-using-our-landlord-direct",
@@ -10492,12 +10497,16 @@
     "2|5500|the-vibrant-paddington-403-forbidden-furnished-long-let-london",
     "2|5500|the-water-hyde-london",
     "2|5500|tottenham court road|chapter-house-parker-street-london-wc2b-500-pcm-1269-beds-bath-reception-850-chapter-house-parker-street-london",
+    "2|6500|mossop-london-sw3-bed-terraced-house-500-pcm",
+    "2|6500|south kensington|mossop-street-london-sw3-bed-terraced-house-500-pcm-marsh-parsons-chelsea-500-pcm-1500-beds-bath-receptions",
     "2|7350|egerton-knightsbridge-sw3-bed-terraced-house-345-pcm-london",
     "2|7350|south kensington|egerton-gardens-mews-knightsbridge-sw3-bed-terraced-house-345-pcm-russell-simpson-premium-345-pcm-1695-beds-baths",
     "2|7800|egerton-knightsbridge-london-sw3-bed-terraced-house-800-pcm",
     "2|7800|south kensington|egerton-gardens-mews-knightsbridge-london-sw3-bed-terraced-house-800-pcm-newington-real-estate-agents-limited-800-pcm",
     "3|10000|ashley-emery-westminster-london-sw1p",
     "3|10000|belgrave-belgravia-sw1x-london",
+    "3|10000|kensington olympia|russell-gardens-mews-holland-park-w14-bed-000-pcm-marsh-parsons-holland-park-000-pcm-2307-beds-baths",
+    "3|10000|russell-holland-w14-bed-000-pcm-london",
     "3|10000|victoria|ashley-gardens-emery-hill-street-westminster-london-sw1p-000-pcm-2307-beds-baths-reception-1909-ashley-gardens-emery",
     "3|10000|victoria|belgrave-place-belgravia-sw1x-000-pcm-308-premium-listing-belgrave-place-belgravia-sw1x-house-miles-from-station-exquisite",
     "3|10000|victoria|west-eaton-place-london-sw1x-tenancy-info-997-pcm-307-west-eaton-place-london-sw1x-apartment-bright-double",
@@ -12528,6 +12537,7 @@
     "6|9750|mary-abbots-terrace-kensington-w14-tenancy-info-750-pcm-250-mary-abbots-terrace-kensington-w14-terraced-house-entrance"
   ],
   "sent_property_keys": [
+    "2|10500|queensbury-west-south-kensington-sw7-2-bed-rent",
     "2|1200|2-bed-flat-harrington-house-nw1-rent-now",
     "2|1400|queensway",
     "2|1600|west-kensington-w14-2-bed-rent-1-650",
@@ -13474,10 +13484,12 @@
     "2|5500|vibrant-paddington-403-forbidden-furnished-long-let",
     "2|5500|w1j-2-bed-rent-5-460-pcm",
     "2|5500|water-hyde",
+    "2|6500|mossop-sw3-2-bed-terraced-house-rent-6",
     "2|7300|egerton-knightsbridge-sw3-2-bed-terraced-house-rent",
     "2|7800|egerton-knightsbridge-sw3-2-bed-terraced-house-rent",
     "3|10000|ashley-emery-westminster-sw1p",
     "3|10000|belgrave-belgravia-sw1x",
+    "3|10000|russell-holland-w14-3-bed-property-rent-10",
     "3|10000|west-eaton-sloane-belgravia-sw1x",
     "3|10000|west-eaton-sw1x",
     "3|1000|3-bed-flat-boswell-wc1n-family-house-central",
@@ -17663,7 +17675,10 @@
     "https://zoopla.co.uk/to-rent/details/74077588",
     "https://zoopla.co.uk/to-rent/details/74175180",
     "https://zoopla.co.uk/to-rent/details/74259380",
-    "https://zoopla.co.uk/to-rent/details/74286339"
+    "https://zoopla.co.uk/to-rent/details/74286339",
+    "https://zoopla.co.uk/to-rent/details/74319074",
+    "https://zoopla.co.uk/to-rent/details/74325259",
+    "https://zoopla.co.uk/to-rent/details/74342211"
   ],
   "subscribers": [
     1922786763
