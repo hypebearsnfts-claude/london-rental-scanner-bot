@@ -7389,15 +7389,19 @@
     "https://zoopla.co.uk/to-rent/details/74286339",
     "https://zoopla.co.uk/to-rent/details/74303132",
     "https://zoopla.co.uk/to-rent/details/74315971",
+    "https://zoopla.co.uk/to-rent/details/74318847",
     "https://zoopla.co.uk/to-rent/details/74319074",
     "https://zoopla.co.uk/to-rent/details/74325259",
     "https://zoopla.co.uk/to-rent/details/74342211",
-    "https://zoopla.co.uk/to-rent/details/74353962"
+    "https://zoopla.co.uk/to-rent/details/74353962",
+    "https://zoopla.co.uk/to-rent/details/74390625"
   ],
-  "last_scan_date": "2026-09-30",
+  "last_scan_date": "2026-10-01",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
+    "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
     "2|10500|gloucester road|queensbury-mews-west-south-kensington-sw7-bed-mews-500-pcm-russell-simpson-500-pcm-2423-beds-baths-953",
+    "2|10500|queensberry-west-south-kensington-sw7-bed-500-pcm-london",
     "2|10500|queensbury-west-south-kensington-sw7-bed-500-pcm-london",
     "2|1200|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200",
     "2|1200|regent's park|london-nw1-3rb-bed-flat-harrington-house-nw1-now-for-200-share-whatsapp-facebook-email-messenger-gmail-copy",
@@ -10219,10 +10223,12 @@
     "2|4900|victoria|flat-900-month-bed-flat-bondway-sw8-landmark-versace-designed-two-bedroom-flat-damac-tower-nine-elms-panoramic",
     "2|4925|leicester square|charing-cross-wc2n-920-pcm-1135-beds-baths-904-charing-cross-wc2n-discover-the-best-london-with-this",
     "2|4925|marble arch|forset-court-edgware-road-london-932-pcm-138-premium-listing-forset-court-edgware-road-london-flat-miles-from",
+    "2|4950|beverston-marylebone-london-w1h-bed-962-pcm",
     "2|4950|bolsover-london-w1w",
     "2|4950|forset-edgware-london",
     "2|4950|great-cumberland-london-w1h",
     "2|4950|leicester square|whitehall-court-london-sw1a-reduced-tenancy-info-950-pcm-142-whitehall-court-london-sw1a-flat-two-bedroomstwo-bathroomssecond",
+    "2|4950|marble arch|beverston-mews-marylebone-london-w1h-bed-mews-962-pcm-newington-real-estate-agents-limited-just-added-962-pcm",
     "2|4950|marble arch|great-cumberland-place-london-w1h-940-pcm-1140-beds-bath-reception-718-great-cumberland-place-london-w1h-elegant",
     "2|4950|regent park|bolsover-street-london-w1w-950-pcm-1142-beds-baths-reception-923-bolsover-street-london-w1w-virtual-tour-available",
     "2|4950|whitehall-london-sw1a",
@@ -12550,6 +12556,7 @@
     "6|9750|mary-abbots-terrace-kensington-w14-tenancy-info-750-pcm-250-mary-abbots-terrace-kensington-w14-terraced-house-entrance"
   ],
   "sent_property_keys": [
+    "2|10500|queensberry-west-south-kensington-sw7-2-bed-rent",
     "2|10500|queensbury-west-south-kensington-sw7-2-bed-rent",
     "2|1200|2-bed-flat-harrington-house-nw1-rent-now",
     "2|1400|queensway",
@@ -13371,6 +13378,7 @@
     "2|5000|bedford-mansions-wc1b-2-bed-rent-5-000",
     "2|5000|belgravia-33-ebury-belgravia",
     "2|5000|belgravia-33-ebury-belgravia-sw1w",
+    "2|5000|beverston-marylebone-w1h-2-bed-rent-4-962",
     "2|5000|bina-south-kensington-sw5",
     "2|5000|bolsover-w1w",
     "2|5000|brompton-sw3",
@@ -17696,10 +17704,12 @@
     "https://zoopla.co.uk/to-rent/details/74268492",
     "https://zoopla.co.uk/to-rent/details/74286339",
     "https://zoopla.co.uk/to-rent/details/74315971",
+    "https://zoopla.co.uk/to-rent/details/74318847",
     "https://zoopla.co.uk/to-rent/details/74319074",
     "https://zoopla.co.uk/to-rent/details/74325259",
     "https://zoopla.co.uk/to-rent/details/74342211",
-    "https://zoopla.co.uk/to-rent/details/74353962"
+    "https://zoopla.co.uk/to-rent/details/74353962",
+    "https://zoopla.co.uk/to-rent/details/74390625"
   ],
   "subscribers": [
     1922786763
