@@ -7410,9 +7410,10 @@
     "https://zoopla.co.uk/to-rent/details/74474496",
     "https://zoopla.co.uk/to-rent/details/74529145",
     "https://zoopla.co.uk/to-rent/details/74530263",
-    "https://zoopla.co.uk/to-rent/details/74557006"
+    "https://zoopla.co.uk/to-rent/details/74557006",
+    "https://zoopla.co.uk/to-rent/details/74580994"
   ],
-  "last_scan_date": "2026-10-22",
+  "last_scan_date": "2026-10-23",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -12209,6 +12210,8 @@
     "4|5525|prince-regent-mews-euston-nw1-525-pcm-1275-beds-baths-reception-prince-regent-mews-euston-nw1-magnificent-four",
     "4|5525|prince-regent-mews-euston-nw1-tenancy-info-525-pcm-275-prince-regent-mews-euston-nw1-flat-194-floor",
     "4|5525|regent's park|prince-regent-mews-euston-nw1-bed-flat-525-pcm-oakford-estates-ltd-highlight-just-added-525-pcm-1275",
+    "4|5600|lancaster gate|michaels-street-paddington-bed-terraced-house-600-pcm-liv-international-just-added-600-pcm-1292-beds-baths-reception",
+    "4|5600|michaels-paddington-bed-terraced-house-600-pcm-london",
     "4|5625|angel|sidney-grove-clerkenwell-london-ec1v-bed-flat-633-pcm-zach-knightons-633-pcm-1300-beds-baths-reception-sidney",
     "4|5625|marble arch|bryanston-court-george-street-marylebone-added-yesterday-tenancy-info-633-pcm-300-bryanston-court-george-street-marylebone-flat",
     "4|5650|bed-flat-kestrel-house-ec1v-short-term-let-only-monthly-stays-london",
@@ -14282,6 +14285,7 @@
     "4|5500|prince-regent-euston-nw1-4-bed-rent-5",
     "4|5600|4-bed-flat-kestrel-house-ec1v-short-term",
     "4|5600|bryanston-george-marylebone",
+    "4|5600|michaels-paddington-4-bed-terraced-house-rent-5",
     "4|5600|sidney-clerkenwell-ec1v-4-bed-rent-5-633",
     "4|5700|osnaburgh-ucl-nw1",
     "4|5800|4-bed-flat-egerton-sw7-rent-now-for",
@@ -17789,7 +17793,8 @@
     "https://zoopla.co.uk/to-rent/details/74474496",
     "https://zoopla.co.uk/to-rent/details/74529145",
     "https://zoopla.co.uk/to-rent/details/74530263",
-    "https://zoopla.co.uk/to-rent/details/74557006"
+    "https://zoopla.co.uk/to-rent/details/74557006",
+    "https://zoopla.co.uk/to-rent/details/74580994"
   ],
   "subscribers": [
     1922786763
