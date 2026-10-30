@@ -7415,9 +7415,11 @@
     "https://zoopla.co.uk/to-rent/details/74559427",
     "https://zoopla.co.uk/to-rent/details/74580994",
     "https://zoopla.co.uk/to-rent/details/74598542",
-    "https://zoopla.co.uk/to-rent/details/74612083"
+    "https://zoopla.co.uk/to-rent/details/74612083",
+    "https://zoopla.co.uk/to-rent/details/74630991",
+    "https://zoopla.co.uk/to-rent/details/74641077"
   ],
-  "last_scan_date": "2026-10-29",
+  "last_scan_date": "2026-10-30",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -10570,8 +10572,10 @@
     "3|10825|bayswater|petersburgh-mews-london-bed-mews-833-pcm-finchlea-estates-limited-just-added-833-pcm-2500-beds-baths-reception",
     "3|10825|bond street|green-street-mayfair-london-w1k-bed-flat-833-pcm-strutt-parker-knightsbridge-belgravia-833-pcm-2500-beds-baths",
     "3|10825|bond street|walden-street-london-w1g-833-pcm-500-recently-renovated-walden-street-london-w1g-maisonette-miles-from-station-brand",
+    "3|10825|kensington olympia|napier-place-kensington-w14-bed-detached-house-833-pcm-wilfords-london-ltd-highlight-just-added-833-pcm-2500",
     "3|10825|oxford circus|richmond-buildings-london-w1d-833-pcm-2500-beds-baths-1725-richmond-buildings-london-w1d-stunning-penthouse-the-5th",
     "3|10850|green-mayfair-london-w1k-bed-flat-833-pcm",
+    "3|10850|napier-kensington-w14-bed-detached-house-833-pcm-london",
     "3|10850|petersburgh-london-bed-833-pcm",
     "3|10850|richmond-buildings-london-w1d",
     "3|10850|walden-london-w1g",
@@ -12408,6 +12412,7 @@
     "4|8500|cato-street-london-w1h-tenancy-info-498-pcm-961-cato-street-london-w1h-house-700-floor-areanearest-station",
     "4|8500|coleherne-court-old-brompton-road-london-sw5-spotlight-tenancy-info-500-pcm-962-coleherne-court-old-brompton-road",
     "4|8500|coleherne-court-old-brompton-road-london-sw5-tenancy-info-500-pcm-962-coleherne-court-old-brompton-road-london",
+    "4|8500|donne-london-sw3-bed-terraced-house-495-pcm",
     "4|8500|drayton-south-kensington-london-sw10-bed-flat-498-pcm",
     "4|8500|drayton-sw10-bed-flat-498-pcm-london",
     "4|8500|gloucester road|drayton-gardens-south-kensington-london-sw10-bed-flat-498-pcm-prime-london-central-just-added-498-pcm-1961",
@@ -12418,6 +12423,7 @@
     "4|8500|old-brompton-road-earls-court-london-featured-tenancy-info-500-pcm-962-old-brompton-road-earls-court-london",
     "4|8500|osten-london-sw7-bed-500-pcm",
     "4|8500|portman-mansions-london-w1u-tenancy-info-498-pcm-961-portman-mansions-london-w1u-flat-four-bedrooms163sqm-marsh-parsons",
+    "4|8500|south kensington|donne-place-london-sw3-bed-terraced-house-495-pcm-just-added-495-pcm-1960-beds-baths-donne-place",
     "4|8675|abbey-lodge-park-road-john-wood-london-nw8-tenancy-info-667-pcm-000-abbey-lodge-park-road-john",
     "4|8675|oakwood-court-abbotsbury-road-kensington-w14-tenancy-info-667-pcm-000-oakwood-court-abbotsbury-road-kensington-w14-apartment",
     "4|8675|park-road-london-nw8-tenancy-info-667-pcm-000-park-road-london-nw8-flat-four-bedroomsthree-bathrooms-dexters",
@@ -13589,6 +13595,7 @@
     "3|10600|eaton-sw1x",
     "3|10600|eaton-sw1x-3-bed-rent-10-617-pcm",
     "3|10800|green-mayfair-w1k-3-bed-rent-10-833",
+    "3|10800|napier-kensington-w14-3-bed-detached-house-rent",
     "3|10800|petersburgh-3-bed-rent-10-833-pcm",
     "3|10800|richmond-buildings-w1d",
     "3|10800|walden-w1g",
@@ -14357,6 +14364,7 @@
     "4|8300|warwick-w14-4-bed-semi-detached-house-rent",
     "4|8500|cato-w1h",
     "4|8500|cato-w1h-4-bed-detached-house-rent-8",
+    "4|8500|donne-sw3-4-bed-terraced-house-rent-8",
     "4|8500|drayton-south-kensington-sw10-4-bed-rent-8",
     "4|8500|drayton-sw10-4-bed-rent-8-498-pcm",
     "4|8500|osten-sw7-4-bed-rent-8-500-pcm",
@@ -17814,7 +17822,9 @@
     "https://zoopla.co.uk/to-rent/details/74559427",
     "https://zoopla.co.uk/to-rent/details/74580994",
     "https://zoopla.co.uk/to-rent/details/74598542",
-    "https://zoopla.co.uk/to-rent/details/74612083"
+    "https://zoopla.co.uk/to-rent/details/74612083",
+    "https://zoopla.co.uk/to-rent/details/74630991",
+    "https://zoopla.co.uk/to-rent/details/74641077"
   ],
   "subscribers": [
     1922786763
