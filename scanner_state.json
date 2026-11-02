@@ -7417,9 +7417,10 @@
     "https://zoopla.co.uk/to-rent/details/74598542",
     "https://zoopla.co.uk/to-rent/details/74612083",
     "https://zoopla.co.uk/to-rent/details/74630991",
-    "https://zoopla.co.uk/to-rent/details/74641077"
+    "https://zoopla.co.uk/to-rent/details/74641077",
+    "https://zoopla.co.uk/to-rent/details/74662646"
   ],
-  "last_scan_date": "2026-11-01",
+  "last_scan_date": "2026-11-02",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -9699,6 +9700,7 @@
     "2|4250|chancery lane|turnmill-street-clerkenwell-ec1m-bed-flat-250-pcm-hurford-salvi-carr-clerkenwell-city-lettings-250-pcm-980-beds",
     "2|4250|charing cross|whitehouse-apartments-se1-250-pcm-980-beds-baths-reception-whitehouse-apartments-se1-exceptional-bedroom-duplex-apartment-with-iconic",
     "2|4250|covent garden|bed-penthouse-belvedere-road-se1-residential-pleased-present-250-per-month-last-updated-around-weeks-ago-bed-penthouse",
+    "2|4250|dorset-w1u-bed-250-pcm-london",
     "2|4250|elvaston-london-sw7",
     "2|4250|elvaston-place-london-sw7-tenancy-info-247-pcm-980-elvaston-place-london-sw7-flat-agent-feesstudents-can-enquire",
     "2|4250|georges-london-sw1v-bed-flat-250-pcm",
@@ -9712,6 +9714,7 @@
     "2|4250|kensington-church-street-london-tenancy-info-250-pcm-981-kensington-church-street-london-flat-two-double-bedroomssplit-level",
     "2|4250|long-acre-london-wc2e-250-pcm-980-beds-baths-reception-long-acre-london-wc2e-are-delighted-present-this",
     "2|4250|long-acre-london-wc2e-250-pcm-981-long-acre-london-wc2e-apartment-are-delighted-present-this-new-two",
+    "2|4250|marble arch|dorset-street-w1u-bed-250-pcm-fraser-london-west-end-just-added-250-pcm-980-beds-baths-863",
     "2|4250|marylebone|merchant-square-east-london-brinkley-estate-agents-247-pcm-980-beds-baths-reception-merchant-square-east-london-this",
     "2|4250|marylebone|merchant-square-east-paddington-london-century-london-central-247-pcm-980-beds-baths-reception-713-merchant-square-east",
     "2|4250|merchant-east-london",
@@ -13250,6 +13253,7 @@
     "2|4200|8-devonshire-w1g",
     "2|4200|addison-holland-w14",
     "2|4200|cedar-house-marylebone-w1u",
+    "2|4200|dorset-w1u-2-bed-property-rent-4-250",
     "2|4200|elvaston-sw7",
     "2|4200|fulham-road",
     "2|4200|georges-sw1v-2-bed-rent-4-250-pcm",
@@ -17824,7 +17828,8 @@
     "https://zoopla.co.uk/to-rent/details/74598542",
     "https://zoopla.co.uk/to-rent/details/74612083",
     "https://zoopla.co.uk/to-rent/details/74630991",
-    "https://zoopla.co.uk/to-rent/details/74641077"
+    "https://zoopla.co.uk/to-rent/details/74641077",
+    "https://zoopla.co.uk/to-rent/details/74662646"
   ],
   "subscribers": [
     1922786763
