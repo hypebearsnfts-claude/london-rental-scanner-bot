@@ -2553,6 +2553,7 @@
     "https://onthemarket.com/details/20417253",
     "https://onthemarket.com/details/20488983",
     "https://onthemarket.com/details/2048913",
+    "https://onthemarket.com/details/20700124",
     "https://onthemarket.com/details/2124190",
     "https://onthemarket.com/details/2415539",
     "https://onthemarket.com/details/2497304",
@@ -7419,9 +7420,10 @@
     "https://zoopla.co.uk/to-rent/details/74612083",
     "https://zoopla.co.uk/to-rent/details/74630991",
     "https://zoopla.co.uk/to-rent/details/74641077",
-    "https://zoopla.co.uk/to-rent/details/74662646"
+    "https://zoopla.co.uk/to-rent/details/74662646",
+    "https://zoopla.co.uk/to-rent/details/74680503"
   ],
-  "last_scan_date": "2026-11-04",
+  "last_scan_date": "2026-11-05",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -9574,6 +9576,7 @@
     "2|4100|fulham-road-sw3-featured-tenancy-info-095-pcm-945-fulham-road-sw3-apartment-receptionkitchen2-bedrooms2-bathrooms-hamptons-chelsea",
     "2|4100|georges-court-258-brompton-road-south-kensington-london-sw3-095-pcm-945-beds-bath-reception-georges-court-258",
     "2|4100|georges-court-258-brompton-road-south-kensington-london-sw3-added-yesterday-tenancy-info-095-pcm-945-georges-court",
+    "2|4100|gloucester road|stratford-road-london-bed-maisonette-100-pcm-946-added-today-tenancy-info-100-pcm-946-stratford-road-london",
     "2|4100|gray-inn-road-bloomsbury-wc1x-tenancy-info-100-pcm-946-gray-inn-road-bloomsbury-wc1x-apartment-tailored-two",
     "2|4100|holborn|equiano-court-london-ec1n-bed-flat-100-pcm-london-homes-limited-100-pcm-946-beds-baths-reception-equiano",
     "2|4100|kensington olympia|warren-house-london-w14-100-pcm-946-beds-baths-reception-warren-house-london-w14-this-beautiful-apartment-offers",
@@ -9597,6 +9600,7 @@
     "2|4100|south kensington|fulham-road-london-sw3-095-pcm-945-beds-baths-reception-fulham-road-london-sw3-bed-bath-apartment-chelsea",
     "2|4100|south-kensington-pelham-court-sw3-095-pcm-945-beds-baths-reception-721-south-kensington-pelham-court-sw3-modern",
     "2|4100|south-kensington-sw7-110-pcm-948-beds-baths-780-south-kensington-sw7-feel-home-wherever-you-choose-live",
+    "2|4100|stratford-london-bed-maisonette-100-pcm-946",
     "2|4100|the-atelier-apartments-sinclair-road-london-reduced-tenancy-info-100-pcm-946-the-atelier-apartments-sinclair-road-london",
     "2|4100|warren-house-beckford-close-warwick-road-london-featured-tenancy-info-100-pcm-946-warren-house-beckford-close-warwick",
     "2|4100|warren-house-london-w14",
@@ -10558,7 +10562,9 @@
     "3|10000|ashley-emery-westminster-london-sw1p",
     "3|10000|belgrave-belgravia-sw1x-london",
     "3|10000|cato-london-w1h-bed-000-pcm",
+    "3|10000|conduit-london-bed-terraced-house-000-pcm",
     "3|10000|kensington olympia|russell-gardens-mews-holland-park-w14-bed-000-pcm-marsh-parsons-holland-park-000-pcm-2307-beds-baths",
+    "3|10000|lancaster gate|conduit-mews-london-bed-terraced-house-000-pcm-just-added-000-pcm-2307-beds-baths-conduit-mews-london",
     "3|10000|marble arch|cato-street-london-w1h-bed-mews-000-pcm-sullivan-consultants-highlight-000-pcm-2307-beds-baths-reception-1970",
     "3|10000|russell-holland-w14-bed-000-pcm-london",
     "3|10000|victoria|ashley-gardens-emery-hill-street-westminster-london-sw1p-000-pcm-2307-beds-baths-reception-1909-ashley-gardens-emery",
@@ -13248,6 +13254,7 @@
     "2|4100|mercer-covent-wc2h",
     "2|4100|pelham-145-fulham-sw3",
     "2|4100|pelham-fulham-sw3",
+    "2|4100|stratford-2-bed-maisonette-rent-4-100-pcm",
     "2|4100|warren-house-w14",
     "2|4200|2-bed-flat-bronze-foundry-house-sw6",
     "2|4200|2-bed-flat-darwin-nw1-rent-now-for",
@@ -13594,6 +13601,7 @@
     "3|10000|ashley-emery-westminster-sw1p",
     "3|10000|belgrave-belgravia-sw1x",
     "3|10000|cato-w1h-3-bed-rent-10-000-pcm",
+    "3|10000|conduit-3-bed-terraced-house-rent-10-000",
     "3|10000|russell-holland-w14-3-bed-property-rent-10",
     "3|10000|west-eaton-sloane-belgravia-sw1x",
     "3|10000|west-eaton-sw1x",
@@ -15636,6 +15644,7 @@
     "https://onthemarket.com/details/20216322",
     "https://onthemarket.com/details/20417253",
     "https://onthemarket.com/details/20488983",
+    "https://onthemarket.com/details/20700124",
     "https://onthemarket.com/details/2443774",
     "https://onthemarket.com/details/2487112",
     "https://onthemarket.com/details/2579384",
@@ -17834,7 +17843,8 @@
     "https://zoopla.co.uk/to-rent/details/74612083",
     "https://zoopla.co.uk/to-rent/details/74630991",
     "https://zoopla.co.uk/to-rent/details/74641077",
-    "https://zoopla.co.uk/to-rent/details/74662646"
+    "https://zoopla.co.uk/to-rent/details/74662646",
+    "https://zoopla.co.uk/to-rent/details/74680503"
   ],
   "subscribers": [
     1922786763
