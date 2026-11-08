@@ -2554,6 +2554,7 @@
     "https://onthemarket.com/details/20488983",
     "https://onthemarket.com/details/2048913",
     "https://onthemarket.com/details/20700124",
+    "https://onthemarket.com/details/20709163",
     "https://onthemarket.com/details/2124190",
     "https://onthemarket.com/details/2415539",
     "https://onthemarket.com/details/2497304",
@@ -7421,9 +7422,11 @@
     "https://zoopla.co.uk/to-rent/details/74630991",
     "https://zoopla.co.uk/to-rent/details/74641077",
     "https://zoopla.co.uk/to-rent/details/74662646",
-    "https://zoopla.co.uk/to-rent/details/74680503"
+    "https://zoopla.co.uk/to-rent/details/74676708",
+    "https://zoopla.co.uk/to-rent/details/74680503",
+    "https://zoopla.co.uk/to-rent/details/74689685"
   ],
-  "last_scan_date": "2026-11-07",
+  "last_scan_date": "2026-11-08",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -10555,6 +10558,8 @@
     "2|7150|gloucester-london-bed-maisonette-150-pcm",
     "2|7350|egerton-knightsbridge-sw3-bed-terraced-house-345-pcm-london",
     "2|7350|south kensington|egerton-gardens-mews-knightsbridge-sw3-bed-terraced-house-345-pcm-russell-simpson-premium-345-pcm-1695-beds-baths",
+    "2|7350|south-molton-london-w1k-bed-maisonette-367-pcm-700",
+    "2|7375|marble arch|south-molton-street-london-w1k-bed-maisonette-367-pcm-700-plaza-estates-knightsbridge-recently-added-tenancy-info-367",
     "2|7800|egerton-knightsbridge-london-sw3-bed-terraced-house-800-pcm",
     "2|7800|south kensington|egerton-gardens-mews-knightsbridge-london-sw3-bed-terraced-house-800-pcm-newington-real-estate-agents-limited-800-pcm",
     "2|9000|albemarle-mayfair-london-w1s-bed-000-pcm-077",
@@ -12589,7 +12594,9 @@
     "5|8750|strathmore-court-london-tenancy-info-753-pcm-020-strathmore-court-london-flat-362-floor-areanearest-station-2mi-living",
     "5|8750|strathmore-london",
     "5|8850|baker street|john-wood-nw8-840-pcm-040-john-wood-nw8-apartment-miles-from-station-spacious-five-bedroom-apartment-set",
+    "5|8850|baker street|strathmore-court-park-road-johns-wood-london-nw8-bed-end-terrace-house-840-pcm-pmp-international-840-pcm",
     "5|8850|john-wood-nw8-london",
+    "5|8850|strathmore-johns-wood-london-nw8-bed-end-house",
     "5|9000|kendal-bed-995-pcm-london",
     "5|9000|kendal-london-bed-town-house-995-pcm",
     "5|9000|marble arch|kendal-street-bed-995-pcm-london-broker-995-pcm-2075-beds-baths-reception-2340-kendal-street-tenure-leasehold",
@@ -13596,6 +13603,7 @@
     "2|6500|mossop-sw3-2-bed-terraced-house-rent-6",
     "2|7200|gloucester-2-bed-maisonette-rent-7-150-pcm",
     "2|7300|egerton-knightsbridge-sw3-2-bed-terraced-house-rent",
+    "2|7400|south-molton-w1k-2-bed-maisonette-rent-7",
     "2|7800|egerton-knightsbridge-sw3-2-bed-terraced-house-rent",
     "2|9000|albemarle-mayfair-w1s-2-bed-property-rent-9",
     "3|10000|ashley-emery-westminster-sw1p",
@@ -14427,6 +14435,7 @@
     "5|8800|john-wood-nw8",
     "5|8800|park-road",
     "5|8800|strathmore-court",
+    "5|8800|strathmore-johns-wood-nw8-5-bed-end-house",
     "5|9000|kendal-5-bed-property-rent-8-995-pcm",
     "5|9000|kendal-5-bed-town-house-rent-8-995",
     "6|10800|southwick-bayswater",
@@ -15645,6 +15654,7 @@
     "https://onthemarket.com/details/20417253",
     "https://onthemarket.com/details/20488983",
     "https://onthemarket.com/details/20700124",
+    "https://onthemarket.com/details/20709163",
     "https://onthemarket.com/details/2443774",
     "https://onthemarket.com/details/2487112",
     "https://onthemarket.com/details/2579384",
@@ -17844,7 +17854,8 @@
     "https://zoopla.co.uk/to-rent/details/74630991",
     "https://zoopla.co.uk/to-rent/details/74641077",
     "https://zoopla.co.uk/to-rent/details/74662646",
-    "https://zoopla.co.uk/to-rent/details/74680503"
+    "https://zoopla.co.uk/to-rent/details/74680503",
+    "https://zoopla.co.uk/to-rent/details/74689685"
   ],
   "subscribers": [
     1922786763
