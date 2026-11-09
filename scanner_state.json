@@ -7424,9 +7424,10 @@
     "https://zoopla.co.uk/to-rent/details/74662646",
     "https://zoopla.co.uk/to-rent/details/74676708",
     "https://zoopla.co.uk/to-rent/details/74680503",
-    "https://zoopla.co.uk/to-rent/details/74689685"
+    "https://zoopla.co.uk/to-rent/details/74689685",
+    "https://zoopla.co.uk/to-rent/details/74716315"
   ],
-  "last_scan_date": "2026-11-08",
+  "last_scan_date": "2026-11-09",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -10559,7 +10560,9 @@
     "2|7350|egerton-knightsbridge-sw3-bed-terraced-house-345-pcm-london",
     "2|7350|south kensington|egerton-gardens-mews-knightsbridge-sw3-bed-terraced-house-345-pcm-russell-simpson-premium-345-pcm-1695-beds-baths",
     "2|7350|south-molton-london-w1k-bed-maisonette-367-pcm-700",
+    "2|7350|south-molton-mayfair-w1k-bed-maisonette-367-pcm-london",
     "2|7375|marble arch|south-molton-street-london-w1k-bed-maisonette-367-pcm-700-plaza-estates-knightsbridge-recently-added-tenancy-info-367",
+    "2|7375|marble arch|south-molton-street-mayfair-w1k-bed-maisonette-367-pcm-ellune-services-ltd-the-week-just-added-367-pcm",
     "2|7800|egerton-knightsbridge-london-sw3-bed-terraced-house-800-pcm",
     "2|7800|south kensington|egerton-gardens-mews-knightsbridge-london-sw3-bed-terraced-house-800-pcm-newington-real-estate-agents-limited-800-pcm",
     "2|9000|albemarle-mayfair-london-w1s-bed-000-pcm-077",
@@ -13603,6 +13606,7 @@
     "2|6500|mossop-sw3-2-bed-terraced-house-rent-6",
     "2|7200|gloucester-2-bed-maisonette-rent-7-150-pcm",
     "2|7300|egerton-knightsbridge-sw3-2-bed-terraced-house-rent",
+    "2|7400|south-molton-mayfair-w1k-2-bed-maisonette-rent",
     "2|7400|south-molton-w1k-2-bed-maisonette-rent-7",
     "2|7800|egerton-knightsbridge-sw3-2-bed-terraced-house-rent",
     "2|9000|albemarle-mayfair-w1s-2-bed-property-rent-9",
@@ -17855,7 +17859,8 @@
     "https://zoopla.co.uk/to-rent/details/74641077",
     "https://zoopla.co.uk/to-rent/details/74662646",
     "https://zoopla.co.uk/to-rent/details/74680503",
-    "https://zoopla.co.uk/to-rent/details/74689685"
+    "https://zoopla.co.uk/to-rent/details/74689685",
+    "https://zoopla.co.uk/to-rent/details/74716315"
   ],
   "subscribers": [
     1922786763
