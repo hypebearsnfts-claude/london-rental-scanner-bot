@@ -7425,9 +7425,11 @@
     "https://zoopla.co.uk/to-rent/details/74676708",
     "https://zoopla.co.uk/to-rent/details/74680503",
     "https://zoopla.co.uk/to-rent/details/74689685",
+    "https://zoopla.co.uk/to-rent/details/74704994",
+    "https://zoopla.co.uk/to-rent/details/74707339",
     "https://zoopla.co.uk/to-rent/details/74716315"
   ],
-  "last_scan_date": "2026-11-09",
+  "last_scan_date": "2026-11-10",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -11225,6 +11227,7 @@
     "3|4950|bond street|marylebone-mews-london-w1g-bed-terraced-house-950-pcm-950-pcm-1142-beds-baths-marylebone-mews-london-w1g",
     "3|4950|marylebone-london-w1g-bed-terraced-house-950-pcm",
     "3|4950|regent's park|albany-street-regents-park-london-nw1-bed-flat-962-pcm-newington-real-estate-agents-limited-just-added-962",
+    "3|4975|gloucester road|stanhope-mews-west-south-kensington-sw7-bed-983-pcm-webster-983-pcm-1150-beds-baths-reception-964-stanhope",
     "3|4975|lancaster gate|cambridge-square-hyde-park-estate-london-984-pcm-1150-beds-baths-reception-1056-cambridge-square-hyde-park-estate",
     "3|4975|lancaster gate|cambridge-square-london-tenancy-info-983-pcm-150-cambridge-square-london-apartment-three-bedroomstwo-bathrooms-manors-baker-street",
     "3|4975|regent park|albany-street-regent-park-london-nw1-983-pcm-1150-beds-bath-reception-1268-albany-street-regent-park-london",
@@ -11279,6 +11282,7 @@
     "3|5000|rossmore-marylebone-london-nw1-bed-flat-000-pcm",
     "3|5000|semley-belgravia-london-sw1w",
     "3|5000|semley-london-sw1w",
+    "3|5000|stanhope-west-south-kensington-sw7-bed-983-pcm-london",
     "3|5000|the-quadrangle-cambridge-london",
     "3|5000|tottenham court road|endell-street-spotlight-tenancy-info-996-pcm-153-endell-street-apartment-recently-renovated-throughoutthree-spacious-bedroomstwo-private-balconieslarge",
     "3|5000|victoria|ashley-gardens-london-sw1p-tenancy-info-001-pcm-154-ashley-gardens-london-sw1p-flat-three-bedroomsnatural-light-marsh",
@@ -13906,6 +13910,7 @@
     "3|5000|rossmore-marylebone-nw1-3-bed-rent-5-000",
     "3|5000|semley-belgravia-sw1w",
     "3|5000|semley-sw1w",
+    "3|5000|stanhope-west-south-kensington-sw7-3-bed-property",
     "3|5100|allsop-nw1",
     "3|5200|3-bed-flat-north-end-w14-rent-now",
     "3|5200|3-bed-flat-oakshott-nw1-rent-now-for",
@@ -17860,6 +17865,7 @@
     "https://zoopla.co.uk/to-rent/details/74662646",
     "https://zoopla.co.uk/to-rent/details/74680503",
     "https://zoopla.co.uk/to-rent/details/74689685",
+    "https://zoopla.co.uk/to-rent/details/74704994",
     "https://zoopla.co.uk/to-rent/details/74716315"
   ],
   "subscribers": [
