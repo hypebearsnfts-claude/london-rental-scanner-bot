@@ -7428,9 +7428,10 @@
     "https://zoopla.co.uk/to-rent/details/74704994",
     "https://zoopla.co.uk/to-rent/details/74707339",
     "https://zoopla.co.uk/to-rent/details/74716315",
-    "https://zoopla.co.uk/to-rent/details/74735755"
+    "https://zoopla.co.uk/to-rent/details/74735755",
+    "https://zoopla.co.uk/to-rent/details/74764627"
   ],
-  "last_scan_date": "2026-11-12",
+  "last_scan_date": "2026-11-13",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -11924,6 +11925,7 @@
     "4|11175|baker-street-marylebone-nw1-175-pcm-2578-beds-baths-reception-1751-baker-street-marylebone-nw1-are-delighted-offer",
     "4|11175|baker-street-marylebone-nw1-tenancy-info-171-pcm-578-baker-street-marylebone-nw1-apartment-four-double-bedrooms-three",
     "4|11250|ennismore-knightsbridge-sw7-bed-267-pcm-london",
+    "4|11250|ennismore-london-sw7-bed-terraced-house-267-pcm",
     "4|11275|merchant-square-east-hyde-park-london-267-pcm-2600-beds-baths-reception-merchant-square-east-hyde-park-london",
     "4|11275|merchant-square-east-hyde-park-london-featured-tenancy-info-267-pcm-600-merchant-square-east-hyde-park-london",
     "4|11275|merchant-square-east-london-tour-tenancy-info-from-267-pcm-600-merchant-square-east-london-apartment-penthouse-apartmentspectacular",
@@ -11931,6 +11933,7 @@
     "4|11275|merchant-square-paddington-tour-tenancy-info-266-pcm-600-merchant-square-paddington-flat-penthouse-apartmentlarge-terrace-riverhomes-south",
     "4|11275|penthouse-merchant-square-paddington-basin-london-recently-added-tenancy-info-267-pcm-600-penthouse-merchant-square-paddington-basin",
     "4|11275|south kensington|ennismore-mews-knightsbridge-sw7-bed-mews-267-pcm-nicolas-van-patrick-267-pcm-2600-beds-baths-receptions-2211",
+    "4|11275|south kensington|ennismore-mews-london-sw7-bed-terraced-house-267-pcm-knightsbridge-prime-just-added-267-pcm-2600-beds-baths",
     "4|11475|knox-street-marylebone-london-w1h-483-pcm-2650-beds-baths-receptions-knox-street-marylebone-london-w1h-hudson-are",
     "4|11475|knox-street-marylebone-london-w1h-483-pcm-650-knox-street-marylebone-london-w1h-terraced-miles-from-station-hudson",
     "4|11675|baker-street-marylebone-london-nw1-674-pcm-694-baker-street-marylebone-london-nw1-apartment-miles-from-station-are",
@@ -14219,6 +14222,7 @@
     "4|11000|prince-wales-kensington",
     "4|1100|4-bed-flat-mulletsfield-wc1h-extra-large-room",
     "4|11300|ennismore-knightsbridge-sw7-4-bed-rent-11-267",
+    "4|11300|ennismore-sw7-4-bed-terraced-house-rent-11",
     "4|11900|catherine-kensington-chelsea-sw3",
     "4|11900|cumberland-mansions-george-w1h",
     "4|12000|bathurst-bayswater-4-bed-rent-12-000-pcm",
@@ -17871,7 +17875,8 @@
     "https://zoopla.co.uk/to-rent/details/74689685",
     "https://zoopla.co.uk/to-rent/details/74704994",
     "https://zoopla.co.uk/to-rent/details/74716315",
-    "https://zoopla.co.uk/to-rent/details/74735755"
+    "https://zoopla.co.uk/to-rent/details/74735755",
+    "https://zoopla.co.uk/to-rent/details/74764627"
   ],
   "subscribers": [
     1922786763
