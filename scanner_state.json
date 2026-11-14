@@ -7429,9 +7429,10 @@
     "https://zoopla.co.uk/to-rent/details/74707339",
     "https://zoopla.co.uk/to-rent/details/74716315",
     "https://zoopla.co.uk/to-rent/details/74735755",
+    "https://zoopla.co.uk/to-rent/details/74746407",
     "https://zoopla.co.uk/to-rent/details/74764627"
   ],
-  "last_scan_date": "2026-11-13",
+  "last_scan_date": "2026-11-14",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -11679,6 +11680,7 @@
     "3|7400|bond street|hill-street-london-410-pcm-710-hill-street-london-apartment-miles-from-station-this-three-bedroom-apartment-features",
     "3|7400|bond street|hill-street-london-london-w1j-410-pcm-1710-beds-baths-hill-street-london-london-w1j-this-spacious-bedroom",
     "3|7400|bond street|hill-street-london-w1j-410-pcm-710-hill-street-london-w1j-flat-miles-from-station-interior-designed-apartment",
+    "3|7400|bond street|hill-street-london-w1j-bed-410-pcm-completion-sales-and-lettings-410-pcm-1710-beds-baths-reception-1203",
     "3|7400|bond street|hill-street-london-w1j-bed-apartment-410-pcm-710-tenancy-info-410-pcm-710-hill-street-london-w1j",
     "3|7400|bond street|hill-street-london-w1j-bed-flat-410-pcm-hamptons-sloane-square-lettings-premium-410-pcm-1710-beds-baths",
     "3|7400|bond street|hill-street-mayfair-london-w1j-bed-flat-410-pcm-carter-jonas-mayfair-410-pcm-1710-beds-baths-reception",
@@ -11686,6 +11688,7 @@
     "3|7400|london",
     "3|7400|london-london-w1j",
     "3|7400|london-w1j",
+    "3|7400|london-w1j-bed-410-pcm",
     "3|7400|london-w1j-bed-apartment-410-pcm-710",
     "3|7400|london-w1j-bed-flat-410-pcm",
     "3|7400|marble arch|bed-flat-hill-w1j-flat-410-month-bed-flat-hill-w1j-this-brand-new-interior-designed-apartment-spans",
@@ -14113,6 +14116,7 @@
     "3|7400|marconi-house-335-strand-aldwych-wc2r",
     "3|7400|mayfair-w1j",
     "3|7400|mayfair-w1j-3-bed-rent-7-410-pcm",
+    "3|7400|w1j-3-bed-property-rent-7-410-pcm",
     "3|7400|w1j-3-bed-rent-7-410-pcm",
     "3|7400|w1j-3-bed-rent-7-410-pcm-1",
     "3|7500|3-bed-flat-princes-gate-sw7-rent-now",
@@ -17876,6 +17880,7 @@
     "https://zoopla.co.uk/to-rent/details/74704994",
     "https://zoopla.co.uk/to-rent/details/74716315",
     "https://zoopla.co.uk/to-rent/details/74735755",
+    "https://zoopla.co.uk/to-rent/details/74746407",
     "https://zoopla.co.uk/to-rent/details/74764627"
   ],
   "subscribers": [
