@@ -7434,9 +7434,10 @@
     "https://zoopla.co.uk/to-rent/details/74764627",
     "https://zoopla.co.uk/to-rent/details/74776524",
     "https://zoopla.co.uk/to-rent/details/74779196",
-    "https://zoopla.co.uk/to-rent/details/74781964"
+    "https://zoopla.co.uk/to-rent/details/74781964",
+    "https://zoopla.co.uk/to-rent/details/74796072"
   ],
-  "last_scan_date": "2026-11-17",
+  "last_scan_date": "2026-11-18",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -10558,6 +10559,8 @@
     "2|5500|the-vibrant-paddington-403-forbidden-furnished-long-let-london",
     "2|5500|the-water-hyde-london",
     "2|5500|tottenham court road|chapter-house-parker-street-london-wc2b-500-pcm-1269-beds-bath-reception-850-chapter-house-parker-street-london",
+    "2|5850|fulham-london-sw3-bed-terraced-house-850-pcm",
+    "2|5850|south kensington|fulham-road-london-sw3-bed-terraced-house-850-pcm-completion-sales-and-lettings-just-added-850-pcm-1350",
     "2|6000|bulstrode-marylebone-w1u-bed-maisonette-000-pcm-london",
     "2|6000|marble arch|bulstrode-street-marylebone-w1u-bed-maisonette-000-pcm-marsh-parsons-marylebone-mayfair-just-added-000-pcm-1384-beds",
     "2|6000|mossop-london-sw3-bed-terraced-house-000-pcm-385",
@@ -13624,6 +13627,7 @@
     "2|5500|vibrant-paddington-403-forbidden-furnished-long-let",
     "2|5500|w1j-2-bed-rent-5-460-pcm",
     "2|5500|water-hyde",
+    "2|5800|fulham-sw3-2-bed-terraced-house-rent-5",
     "2|6000|bulstrode-marylebone-w1u-2-bed-maisonette-rent-6",
     "2|6000|mossop-sw3-2-bed-terraced-house-rent-6",
     "2|6500|mossop-sw3-2-bed-terraced-house-rent-6",
@@ -17897,7 +17901,8 @@
     "https://zoopla.co.uk/to-rent/details/74746407",
     "https://zoopla.co.uk/to-rent/details/74764627",
     "https://zoopla.co.uk/to-rent/details/74779196",
-    "https://zoopla.co.uk/to-rent/details/74781964"
+    "https://zoopla.co.uk/to-rent/details/74781964",
+    "https://zoopla.co.uk/to-rent/details/74796072"
   ],
   "subscribers": [
     1922786763
