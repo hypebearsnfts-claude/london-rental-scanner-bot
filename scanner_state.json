@@ -7437,9 +7437,10 @@
     "https://zoopla.co.uk/to-rent/details/74776524",
     "https://zoopla.co.uk/to-rent/details/74779196",
     "https://zoopla.co.uk/to-rent/details/74781964",
-    "https://zoopla.co.uk/to-rent/details/74796072"
+    "https://zoopla.co.uk/to-rent/details/74796072",
+    "https://zoopla.co.uk/to-rent/details/74841525"
   ],
-  "last_scan_date": "2026-11-23",
+  "last_scan_date": "2026-11-24",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -10563,9 +10564,11 @@
     "2|5500|tottenham court road|chapter-house-parker-street-london-wc2b-500-pcm-1269-beds-bath-reception-850-chapter-house-parker-street-london",
     "2|5850|fulham-london-sw3-bed-terraced-house-850-pcm",
     "2|5850|south kensington|fulham-road-london-sw3-bed-terraced-house-850-pcm-completion-sales-and-lettings-just-added-850-pcm-1350",
+    "2|6000|bayswater|pembridge-mews-london-w11-bed-terraced-house-000-pcm-chancellors-notting-hill-just-added-000-pcm-1384-beds",
     "2|6000|bulstrode-marylebone-w1u-bed-maisonette-000-pcm-london",
     "2|6000|marble arch|bulstrode-street-marylebone-w1u-bed-maisonette-000-pcm-marsh-parsons-marylebone-mayfair-just-added-000-pcm-1384-beds",
     "2|6000|mossop-london-sw3-bed-terraced-house-000-pcm-385",
+    "2|6000|pembridge-london-w11-bed-terraced-house-000-pcm",
     "2|6000|south kensington|mossop-street-london-sw3-bed-terraced-house-000-pcm-385-marsh-parsons-chelsea-rawlings-house-milner-street-london",
     "2|6500|mossop-london-sw3-bed-terraced-house-500-pcm",
     "2|6500|south kensington|mossop-street-london-sw3-bed-terraced-house-500-pcm-marsh-parsons-chelsea-500-pcm-1500-beds-bath-receptions",
@@ -13636,6 +13639,7 @@
     "2|5800|fulham-sw3-2-bed-terraced-house-rent-5",
     "2|6000|bulstrode-marylebone-w1u-2-bed-maisonette-rent-6",
     "2|6000|mossop-sw3-2-bed-terraced-house-rent-6",
+    "2|6000|pembridge-w11-2-bed-terraced-house-rent-6",
     "2|6500|mossop-sw3-2-bed-terraced-house-rent-6",
     "2|7200|gloucester-2-bed-maisonette-rent-7-150-pcm",
     "2|7300|egerton-knightsbridge-sw3-2-bed-terraced-house-rent",
@@ -17912,7 +17916,8 @@
     "https://zoopla.co.uk/to-rent/details/74764627",
     "https://zoopla.co.uk/to-rent/details/74779196",
     "https://zoopla.co.uk/to-rent/details/74781964",
-    "https://zoopla.co.uk/to-rent/details/74796072"
+    "https://zoopla.co.uk/to-rent/details/74796072",
+    "https://zoopla.co.uk/to-rent/details/74841525"
   ],
   "subscribers": [
     1922786763
