@@ -7438,9 +7438,10 @@
     "https://zoopla.co.uk/to-rent/details/74779196",
     "https://zoopla.co.uk/to-rent/details/74781964",
     "https://zoopla.co.uk/to-rent/details/74796072",
-    "https://zoopla.co.uk/to-rent/details/74841525"
+    "https://zoopla.co.uk/to-rent/details/74841525",
+    "https://zoopla.co.uk/to-rent/details/74847737"
   ],
-  "last_scan_date": "2026-11-24",
+  "last_scan_date": "2026-11-25",
   "last_scan_failure_date": "",
   "sent_fingerprints": [
     "2|10500|gloucester road|queensberry-mews-west-south-kensington-sw7-bed-mews-500-pcm-jll-chelsea-knightsbridge-500-pcm-2423-beds-baths",
@@ -11282,12 +11283,14 @@
     "3|5000|great-cumberland-london-w1h",
     "3|5000|gunterstone-london-w14",
     "3|5000|junction-london-bed-detached-house-000-pcm",
+    "3|5000|junction-london-bed-terraced-house-000-pcm",
     "3|5000|kensington olympia|403-forbidden-latymers-just-added-000-pcm-1153-beds-baths-reception-1288-regent-house-windsor-way-hammersmith-w14",
     "3|5000|kensington olympia|gunterstone-road-london-w14-000-pcm-1153-beds-baths-reception-1152-gunterstone-road-london-w14-beautifully-designed-and",
     "3|5000|kensington olympia|london-bed-flat-challoner-mansions-w14-now-for-000-flat-000-month-bed-flat-challoner-mansions-w14-contractor",
     "3|5000|kensington olympia|marlborough-court-pembroke-road-kensington-tenancy-info-000-pcm-154-marlborough-court-pembroke-road-kensington-flat-available-from",
     "3|5000|lancaster gate|bedroom-flat-for-rent-merchant-square-east-london-995-pcm-153-merchant-square-east-london-flat-miles-from",
     "3|5000|lancaster gate|junction-place-london-bed-detached-house-000-pcm-venice-just-added-000-pcm-1153-beds-bath-reception-junction",
+    "3|5000|lancaster gate|junction-place-london-bed-terraced-house-000-pcm-venice-just-added-000-pcm-1153-beds-bath-reception-junction",
     "3|5000|lancaster gate|paddington-bedrooms-flat-001-pcm-154-guide-price-paddington-bedrooms-flat-flat-miles-from-station-reference-number-pr171408",
     "3|5000|london-bed-flat-challoner-mansions-w14-now-for-000",
     "3|5000|marble arch|burwood-place-london-2hn-000-pcm-154-burwood-place-london-2hn-apartment-miles-from-station-spacious-and-high",
@@ -13936,6 +13939,7 @@
     "3|5000|great-cumberland-w1h",
     "3|5000|gunterstone-w14",
     "3|5000|junction-3-bed-detached-house-rent-5-000",
+    "3|5000|junction-3-bed-terraced-house-rent-5-000",
     "3|5000|marlborough-pembroke-kensington",
     "3|5000|marylebone-w1g-3-bed-terraced-house-rent-4",
     "3|5000|paddington",
@@ -17917,7 +17921,8 @@
     "https://zoopla.co.uk/to-rent/details/74779196",
     "https://zoopla.co.uk/to-rent/details/74781964",
     "https://zoopla.co.uk/to-rent/details/74796072",
-    "https://zoopla.co.uk/to-rent/details/74841525"
+    "https://zoopla.co.uk/to-rent/details/74841525",
+    "https://zoopla.co.uk/to-rent/details/74847737"
   ],
   "subscribers": [
     1922786763
